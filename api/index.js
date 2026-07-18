@@ -736,9 +736,26 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
 
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
   const { nickname, email, phone } = req.body;
+  const allowedFields = {};
+  if (nickname !== undefined) allowedFields.nickname = nickname;
+  if (email !== undefined) allowedFields.email = email;
+  if (phone !== undefined) allowedFields.phone = phone;
   try {
-    await dbUpdate('users', { nickname: nickname || '', email: email || '', phone: phone || '' }, { id: parseInt(req.params.id) });
+    await dbUpdate('users', allowedFields, { id: parseInt(req.params.id) });
     res.json({ success: true, message: 'User updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/reset-password/:id', requireAuth, requireAdmin, async (req, res) => {
+  const { newPassword } = req.body;
+  if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  try {
+    const user = await dbQuery('users', 'id, username', { id: parseInt(req.params.id) }, { single: true });
+    if (!user.data) return res.status(404).json({ error: 'User not found' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await dbUpdate('users', { password: hashed }, { id: parseInt(req.params.id) });
+    await dbInsert('notifications', { user_id: parseInt(req.params.id), title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
+    res.json({ success: true, message: `Password reset for ${user.data.username}` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

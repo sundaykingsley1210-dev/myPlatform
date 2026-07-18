@@ -193,6 +193,7 @@
             ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
               <button class="btn btn-accent btn-sm" onclick="creditBalance(${u.id},'${displayName}')"><i class="fas fa-plus-circle"></i> Credit</button>
               <button class="btn btn-outline btn-sm" onclick="editUser(${u.id},'${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
+              <button class="btn btn-outline btn-sm" onclick="resetUserPassword(${u.id},'${displayName}')" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-key"></i> Reset Password</button>
               <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${displayName}')"><i class="fas fa-trash"></i> Delete</button>
             </div>` : ''}
           </div>`;
@@ -527,6 +528,18 @@
         })});
         const data = await res.json();
         if (res.ok) { showToast('User updated', 'success'); document.getElementById('editUserCard').remove(); loadUsers(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+    }
+
+    async function resetUserPassword(userId, username) {
+      const newPass = prompt('Enter new password for ' + username + ' (min 6 characters):');
+      if (!newPass) return;
+      if (newPass.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+      try {
+        const res = await API('/api/admin/reset-password/' + userId, { method: 'POST', body: JSON.stringify({ newPassword: newPass }) });
+        const data = await res.json();
+        if (res.ok) showToast(data.message, 'success');
         else showToast(data.error, 'error');
       } catch (err) { showToast('Failed', 'error'); }
     }
