@@ -59,8 +59,10 @@
       </div>
       <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
       <div class="dash-panel" id="panel-new-invest">
-        <h3 style="margin-bottom:20px;">Select a VIP Plan to Invest</h3>
-        <div class="vip-select-grid" id="vipSelectGrid"></div>
+        <div id="vipPlanSelector">
+          <h3 style="margin-bottom:20px;"><i class="fas fa-crown" style="color:var(--gold);margin-right:8px;"></i> Select a VIP Plan</h3>
+          <div class="vip-select-grid" id="vipSelectGrid"></div>
+        </div>
         <div id="paymentArea" style="display:none;"></div>
       </div>
       <div class="dash-panel" id="panel-withdraw">
@@ -134,11 +136,14 @@
       const grid = document.getElementById('vipSelectGrid');
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
+        const totalEarned = plan.dailyReturn * 730;
+        const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
         html += `<div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
           <div class="price">₦${plan.amount.toLocaleString()}</div>
           <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
-          <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
+          <div class="vip-roi-badge">${roi}% ROI</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
         </div>`;
       }
       grid.innerHTML = html;
@@ -148,49 +153,187 @@
       document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
       document.getElementById('vipCard' + level).classList.add('selected');
       const plan = vipPlans[level];
+      const totalEarned = plan.dailyReturn * 730;
+      const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
       const pa = document.getElementById('paymentArea');
       pa.style.display = 'block';
-      pa.innerHTML = `<div class="payment-details-box">
-        <h3><i class="fas fa-crown" style="color:var(--gold);margin-right:8px;"></i> VIP ${level}</h3>
-        <div class="payment-detail-row"><span class="label">Amount</span><span class="value">₦${plan.amount.toLocaleString()}</span></div>
-        <div class="payment-detail-row"><span class="label">Daily Return</span><span class="value" style="color:var(--accent);">₦${plan.dailyReturn.toLocaleString()}</span></div>
-        <div class="payment-detail-row"><span class="label">Withdrawal</span><span class="value">${plan.withdrawalDay}s</span></div>
-        <div class="payment-detail-row"><span class="label">Duration</span><span class="value">2 Years</span></div>
-        <div style="margin-top:20px;text-align:center;">
-          <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn"><i class="fas fa-money-bill-transfer"></i> Proceed to Payment</button>
+      pa.innerHTML = `<div class="vip-detail-card">
+        <div class="vip-detail-header">
+          <div class="vip-detail-crown"><i class="fas fa-crown"></i></div>
+          <div>
+            <h3 class="vip-detail-title">VIP ${level} Investment</h3>
+            <p class="vip-detail-subtitle">2-Year Partnership Plan</p>
+          </div>
+        </div>
+
+        <div class="vip-detail-amount">
+          <div class="vip-detail-amount-label">Investment Amount</div>
+          <div class="vip-detail-amount-value">₦${plan.amount.toLocaleString()}</div>
+        </div>
+
+        <div class="vip-features-grid">
+          <div class="vip-feature-item">
+            <i class="fas fa-coins" style="color:var(--accent);"></i>
+            <div><div class="vip-feature-label">Daily Return</div><div class="vip-feature-value">₦${plan.dailyReturn.toLocaleString()}</div></div>
+          </div>
+          <div class="vip-feature-item">
+            <i class="fas fa-calendar-check" style="color:var(--primary);"></i>
+            <div><div class="vip-feature-label">Withdrawal Day</div><div class="vip-feature-value">${plan.withdrawalDay}s</div></div>
+          </div>
+          <div class="vip-feature-item">
+            <i class="fas fa-clock" style="color:var(--gold);"></i>
+            <div><div class="vip-feature-label">Duration</div><div class="vip-feature-value">2 Years (730 days)</div></div>
+          </div>
+          <div class="vip-feature-item">
+            <i class="fas fa-chart-line" style="color:#22c55e;"></i>
+            <div><div class="vip-feature-label">Total Earnings</div><div class="vip-feature-value">₦${totalEarned.toLocaleString()}</div></div>
+          </div>
+          <div class="vip-feature-item">
+            <i class="fas fa-percentage" style="color:#a855f7;"></i>
+            <div><div class="vip-feature-label">Return on Investment</div><div class="vip-feature-value">${roi}%</div></div>
+          </div>
+          <div class="vip-feature-item">
+            <i class="fas fa-briefcase" style="color:#06b6d4;"></i>
+            <div><div class="vip-feature-label">Monthly Return</div><div class="vip-feature-value">₦${(plan.dailyReturn * 30).toLocaleString()}</div></div>
+          </div>
+        </div>
+
+        <div class="vip-detail-summary">
+          <div class="vip-summary-row"><span>Investment</span><span>₦${plan.amount.toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Daily Return</span><span>₦${plan.dailyReturn.toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Monthly (30 days)</span><span>₦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Yearly (365 days)</span><span>₦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
+          <div class="vip-summary-row total"><span>Total (2 Years)</span><span>₦${totalEarned.toLocaleString()}</span></div>
+        </div>
+
+        <div style="margin-top:24px;text-align:center;">
+          <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn" style="width:100%;max-width:400px;">
+            <i class="fas fa-money-bill-transfer"></i> Proceed to Payment
+          </button>
+          <button class="btn btn-outline" onclick="cancelVipSelection()" style="margin-top:10px;width:100%;max-width:400px;">
+            <i class="fas fa-arrow-left"></i> Back to Plans
+          </button>
         </div>
         <div id="generatedPayment" style="margin-top:20px;"></div>
       </div>`;
+      pa.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+
+    function cancelVipSelection() {
+      document.getElementById('paymentArea').style.display = 'none';
+      document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('vipPlanSelector').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    let autoVerifyInterval = null;
+    let autoVerifyAttempts = 0;
+    const MAX_AUTO_VERIFY = 30;
 
     async function createInvestment(level) {
       const btn = document.getElementById('investBtn');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating...';
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating payment details...';
       try {
         const res = await API('/api/create-investment', { method: 'POST', body: JSON.stringify({ vipLevel: level }) });
         const data = await res.json();
         if (res.ok) {
           const pd = data.paymentDetails;
           document.getElementById('generatedPayment').innerHTML = `
-            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below.</div>
-            <div class="payment-detail-row"><span class="label">Bank</span><span class="value">${pd.bankName}</span></div>
-            <div class="payment-detail-row"><span class="label">Account Number</span><span class="value" style="font-size:1.1rem;letter-spacing:1px;">${pd.accountNumber}</span></div>
-            <div class="payment-detail-row"><span class="label">Account Name</span><span class="value">${pd.accountName}</span></div>
-            <div class="payment-detail-row"><span class="label">Amount</span><span class="value" style="color:var(--primary);font-size:1.2rem;">₦${pd.amount.toLocaleString()}</span></div>
-            <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.8rem;">${pd.reference}</span></div>
-            <div style="margin-top:16px;text-align:center;"><button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')"><i class="fas fa-check-double"></i> I've Made Payment</button></div>`;
+            <div class="payment-generated-box">
+              <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below to this account</div>
+              <div class="payment-bank-card">
+                <div class="payment-bank-name"><i class="fas fa-university"></i> ${pd.bankName}</div>
+                <div class="payment-account-number" onclick="copyText('${pd.accountNumber}')" title="Tap to copy">${pd.accountNumber}<i class="fas fa-copy" style="margin-left:10px;font-size:0.8rem;opacity:0.6;"></i></div>
+                <div class="payment-account-name">${pd.accountName}</div>
+              </div>
+              <div class="payment-amount-box">
+                <div class="payment-amount-label">Amount to Pay</div>
+                <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
+              </div>
+              <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.75rem;word-break:break-all;">${pd.reference}</span></div>
+              <div class="payment-timer" id="paymentTimer">
+                <i class="fas fa-hourglass-half"></i> Auto-checking payment status...
+                <div class="payment-timer-bar"><div class="payment-timer-fill" id="timerFill"></div></div>
+              </div>
+              <div style="margin-top:16px;text-align:center;display:flex;flex-direction:column;gap:10px;">
+                <button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')" id="verifyBtn" style="width:100%;">
+                  <i class="fas fa-check-double"></i> I've Made Payment
+                </button>
+                <button class="btn btn-outline" onclick="cancelInvestment('${pd.reference}')" style="width:100%;">
+                  <i class="fas fa-times"></i> Cancel
+                </button>
+              </div>
+            </div>`;
           btn.style.display = 'none';
-        } else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment'; }
-      } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment'; }
+          startAutoVerify(pd.reference);
+        } else {
+          showToast(data.error, 'error');
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
+        }
+      } catch (err) {
+        showToast('Network error', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
+      }
+    }
+
+    function startAutoVerify(reference) {
+      autoVerifyAttempts = 0;
+      if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+      autoVerifyInterval = setInterval(async () => {
+        autoVerifyAttempts++;
+        const fill = document.getElementById('timerFill');
+        if (fill) fill.style.width = ((autoVerifyAttempts / MAX_AUTO_VERIFY) * 100) + '%';
+        if (autoVerifyAttempts >= MAX_AUTO_VERIFY) {
+          clearInterval(autoVerifyInterval);
+          const timer = document.getElementById('paymentTimer');
+          if (timer) timer.innerHTML = '<i class="fas fa-info-circle"></i> Auto-check stopped. Click "I\'ve Made Payment" when ready.';
+          return;
+        }
+        try {
+          const res = await API('/api/verify-payment', { method: 'POST', body: JSON.stringify({ reference }) });
+          const data = await res.json();
+          if (res.ok && data.message !== 'Transaction not found') {
+            clearInterval(autoVerifyInterval);
+            showToast('Payment verified! Investment activated.', 'success');
+            loadInvestments();
+            loadUserData();
+            document.getElementById('paymentArea').style.display = 'none';
+          }
+        } catch (e) {}
+      }, 10000);
     }
 
     async function verifyPayment(reference) {
+      const btn = document.getElementById('verifyBtn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying...'; }
       try {
         const res = await API('/api/verify-payment', { method: 'POST', body: JSON.stringify({ reference }) });
         const data = await res.json();
-        if (res.ok) { showToast(data.message, 'success'); loadInvestments(); loadUserData(); document.getElementById('paymentArea').style.display = 'none'; }
-        else showToast(data.error, 'error');
-      } catch (err) { showToast('Verification failed', 'error'); }
+        if (res.ok) {
+          if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+          showToast(data.message, 'success');
+          loadInvestments();
+          loadUserData();
+          document.getElementById('paymentArea').style.display = 'none';
+        } else {
+          showToast(data.error || 'Payment not yet confirmed. Please wait a few minutes after transfer.', 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; }
+        }
+      } catch (err) {
+        showToast('Verification failed. Try again.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; }
+      }
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => showToast('Copied!', 'success')).catch(() => {});
+    }
+
+    async function cancelInvestment(reference) {
+      if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+      document.getElementById('paymentArea').style.display = 'none';
+      document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
     }
 
     async function loadUserData() {

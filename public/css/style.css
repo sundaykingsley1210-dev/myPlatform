@@ -1542,6 +1542,229 @@ body {
   margin-top: 4px;
 }
 
+.vip-roi-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.vip-detail-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 24px;
+  margin-top: 16px;
+}
+
+.vip-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.vip-detail-crown {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold), #f59e0b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #0a0e27;
+  flex-shrink: 0;
+}
+
+.vip-detail-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 2px;
+}
+
+.vip-detail-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.vip-detail-amount {
+  text-align: center;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(0, 87, 255, 0.08), rgba(0, 87, 255, 0.02));
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 87, 255, 0.15);
+  margin-bottom: 20px;
+}
+
+.vip-detail-amount-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.vip-detail-amount-value {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--primary);
+}
+
+.vip-features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.vip-feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-dark);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.vip-feature-item i {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.vip-feature-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.vip-feature-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.vip-detail-summary {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.vip-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.vip-summary-row:last-child { border-bottom: none; }
+
+.vip-summary-row.total {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--accent);
+  border-top: 2px solid var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.payment-generated-box {
+  margin-top: 16px;
+}
+
+.payment-bank-card {
+  background: linear-gradient(135deg, var(--bg-dark), rgba(0, 87, 255, 0.05));
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  text-align: center;
+  margin: 16px 0;
+}
+
+.payment-bank-name {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.payment-bank-name i { margin-right: 6px; }
+
+.payment-account-number {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px 0;
+  transition: var(--transition);
+}
+
+.payment-account-number:hover {
+  color: var(--primary);
+}
+
+.payment-account-name {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.payment-amount-box {
+  text-align: center;
+  padding: 16px;
+  background: rgba(34, 197, 94, 0.08);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  margin-bottom: 16px;
+}
+
+.payment-amount-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.payment-amount-value {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #22c55e;
+}
+
+.payment-timer {
+  text-align: center;
+  padding: 12px;
+  background: rgba(0, 87, 255, 0.05);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 12px;
+}
+
+.payment-timer-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.payment-timer-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 2px;
+  width: 0%;
+  transition: width 10s linear;
+}
+
 /* ===================== RESPONSIVE ===================== */
 
 /* Large desktops 1200px+ */
@@ -1619,6 +1842,17 @@ body {
   .vip-select-card { padding: 12px 8px; }
   .payment-details-box { padding: 16px; }
   .payment-detail-row { flex-direction: column; gap: 4px; padding: 8px 0; }
+  .vip-detail-card { padding: 16px; }
+  .vip-detail-header { gap: 12px; }
+  .vip-detail-crown { width: 44px; height: 44px; font-size: 1.2rem; }
+  .vip-detail-title { font-size: 1.1rem; }
+  .vip-detail-amount-value { font-size: 1.6rem; }
+  .vip-features-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vip-feature-item { padding: 10px 8px; gap: 8px; }
+  .vip-feature-item i { font-size: 1rem; }
+  .payment-bank-card { padding: 20px 16px; }
+  .payment-account-number { font-size: 1.5rem; letter-spacing: 2px; }
+  .payment-amount-value { font-size: 1.4rem; }
   .auth-card { padding: 32px 20px; margin: 16px; }
   .withdrawal-card { padding: 16px; }
   .withdrawal-header { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -1665,6 +1899,12 @@ body {
   .claim-btn-container .btn { width: 100%; font-size: 0.82rem; padding: 10px 14px; }
   .vip-select-grid { grid-template-columns: 1fr; }
   .vip-select-card { padding: 14px 12px; }
+  .vip-detail-card { padding: 14px; }
+  .vip-detail-amount-value { font-size: 1.4rem; }
+  .vip-features-grid { grid-template-columns: 1fr; }
+  .vip-feature-item { padding: 10px; }
+  .payment-account-number { font-size: 1.3rem; letter-spacing: 1px; }
+  .payment-amount-value { font-size: 1.3rem; }
   .form-group input { padding: 11px 14px; font-size: 0.9rem; }
   .auth-card { padding: 24px 16px; }
   .auth-card h2 { font-size: 1.3rem; }

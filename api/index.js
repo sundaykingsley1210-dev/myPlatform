@@ -151,7 +151,7 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
       };
     }
 
-    await dbInsert('transactions', { user_id: req.userId, type: 'investment', amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || accountDetails.bank_name || 'Bank', account_number: accountDetails.accountNumber || accountDetails.account_number || '0000000000', account_name: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}` });
+    await dbInsert('transactions', { user_id: req.userId, type: 'investment', vip_level: parseInt(vipLevel), amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || accountDetails.bank_name || 'Bank', account_number: accountDetails.accountNumber || accountDetails.account_number || '0000000000', account_name: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}` });
 
     res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, bankName: accountDetails.bankName || accountDetails.bank_name || 'Bank', accountNumber: accountDetails.accountNumber || accountDetails.account_number || '0000000000', accountName: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}`, vipLevel } });
   } catch (err) { res.status(500).json({ error: 'Failed: ' + err.message }); }
@@ -307,6 +307,20 @@ app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
     const pendingWithdrawalAmount = withdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
 
     res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals, totalInvestedAmount, pendingWithdrawalAmount } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/transactions', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('transactions', '*', {}, { order: { column: 'created_at', ascending: false } });
+    res.json({ transactions: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/investments', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('investments', '*', {}, { order: { column: 'created_at', ascending: false } });
+    res.json({ investments: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

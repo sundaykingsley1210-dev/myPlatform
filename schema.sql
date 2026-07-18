@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id),
   type TEXT NOT NULL,
+  vip_level INTEGER DEFAULT 0,
   amount REAL NOT NULL,
   status TEXT DEFAULT 'pending',
   reference TEXT,
