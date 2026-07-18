@@ -1543,6 +1543,32 @@ body {
 }
 
 /* ===================== RESPONSIVE ===================== */
+
+/* Large desktops 1200px+ */
+@media (min-width: 1200px) {
+  .container { max-width: 1200px; }
+  .plans-grid { gap: 28px; }
+  .steps-grid { gap: 36px; }
+}
+
+/* Tablets landscape & small laptops 768px - 1024px */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .nav-links { gap: 20px; }
+  .nav-links a { font-size: 0.82rem; }
+  .hero h1 { font-size: 2.8rem; }
+  .hero-stats { gap: 32px; }
+  .plans-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .about-grid { gap: 40px; }
+  .about-content h2 { font-size: 2rem; }
+  .achievements-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .awards-grid { grid-template-columns: repeat(2, 1fr); }
+  .footer-grid { grid-template-columns: 2fr 1fr 1fr 1fr; gap: 24px; }
+  .dash-stats { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .dash-tab { padding: 9px 16px; font-size: 0.82rem; }
+  .vip-select-grid { grid-template-columns: repeat(4, 1fr); gap: 10px; }
+}
+
+/* Below 1024px */
 @media (max-width: 1024px) {
   .plans-grid { grid-template-columns: repeat(2, 1fr); }
   .steps-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1554,19 +1580,22 @@ body {
   .vip-select-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* Mobile & tablets portrait up to 768px */
 @media (max-width: 768px) {
   .nav-links, .nav-actions { display: none; }
   .mobile-menu { display: block; }
+  .hero { min-height: auto; padding: 100px 16px 50px; }
   .hero h1 { font-size: 2rem; }
   .hero-text { font-size: 1rem; padding: 0 10px; }
   .hero-stats { flex-direction: column; gap: 16px; }
   .hero-cta { flex-direction: column; align-items: center; }
   .hero-cta .btn { width: 100%; max-width: 300px; justify-content: center; }
-  .plans-grid { grid-template-columns: 1fr; }
+  .plans-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
   .about-grid { grid-template-columns: 1fr; gap: 32px; }
   .about-content h2 { font-size: 1.8rem; }
+  .about-content p { font-size: 0.95rem; }
   .achievements-grid { grid-template-columns: 1fr; }
-  .steps-grid { grid-template-columns: 1fr; }
+  .steps-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
   .mission-values { grid-template-columns: 1fr; }
   .mission-card { padding: 32px 20px; }
   .section-header h2 { font-size: 1.6rem; }
@@ -1592,8 +1621,12 @@ body {
   .payment-detail-row { flex-direction: column; gap: 4px; padding: 8px 0; }
   .auth-card { padding: 32px 20px; margin: 16px; }
   .withdrawal-card { padding: 16px; }
+  .withdrawal-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .navbar { height: auto; }
+  .nav-container { height: 60px; }
 }
 
+/* Small phones up to 480px */
 @media (max-width: 480px) {
   .container { padding: 0 12px; }
   .hero { padding: 80px 12px 40px; }
@@ -1604,8 +1637,8 @@ body {
   .stat-label { font-size: 0.75rem; }
   .btn-lg { padding: 12px 24px; font-size: 0.9rem; }
   .btn { padding: 10px 16px; font-size: 0.85rem; }
-  .plans-section, .how-it-works, .about-section, .achievements-section, .launch-section, .cta-section { padding: 60px 0; }
-  .section-header { margin-bottom: 32px; }
+  .plans-section, .how-it-works, .about-section, .achievements-section, .launch-section, .cta-section, .mission { padding: 50px 0; }
+  .section-header { margin-bottom: 28px; }
   .section-header h2 { font-size: 1.4rem; }
   .plan-card { padding: 24px 16px; }
   .plan-amount .amount { font-size: 1.6rem; }
@@ -1619,8 +1652,10 @@ body {
   .launch-content h2 { font-size: 1.5rem; }
   .launch-content > p { font-size: 0.9rem; }
   .launch-visual h3 { font-size: 1rem; }
+  .launch-emoji { font-size: 3rem; }
   .dash-stats { gap: 12px; }
   .dash-stat-card { padding: 16px; }
+  .dash-stat-card .label { font-size: 0.7rem; }
   .dash-stat-card .value { font-size: 1.4rem; }
   .investment-card { padding: 16px; }
   .investment-header { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -1629,13 +1664,17 @@ body {
   .invest-detail .val { font-size: 0.85rem; }
   .claim-btn-container .btn { width: 100%; font-size: 0.82rem; padding: 10px 14px; }
   .vip-select-grid { grid-template-columns: 1fr; }
+  .vip-select-card { padding: 14px 12px; }
   .form-group input { padding: 11px 14px; font-size: 0.9rem; }
   .auth-card { padding: 24px 16px; }
   .auth-card h2 { font-size: 1.3rem; }
   .footer-bottom p { font-size: 0.72rem; }
   .toast { left: 12px; right: 12px; bottom: 12px; font-size: 0.82rem; text-align: center; }
+  .empty-state { padding: 40px 16px; }
+  .empty-state i { font-size: 2rem; }
 }
 
+/* Very small phones up to 360px */
 @media (max-width: 360px) {
   .hero h1 { font-size: 1.45rem; }
   .hero-text { font-size: 0.82rem; }
@@ -1644,6 +1683,10 @@ body {
   .section-header h2 { font-size: 1.25rem; }
   .dash-tab { padding: 7px 10px; font-size: 0.72rem; }
   .stat-number { font-size: 1.3rem; }
+  .dash-stat-card .value { font-size: 1.2rem; }
+  .mission-card { padding: 24px 14px; }
+  .mission-card h2 { font-size: 1.3rem; }
+  .about-content h2 { font-size: 1.5rem; }
 }
 
 /* Touch-friendly tap targets */
@@ -1653,6 +1696,7 @@ body {
   .plan-card .btn { min-height: 44px; }
   .claim-btn-container .btn { min-height: 44px; }
   .mobile-menu { min-height: 44px; min-width: 44px; }
+  .vip-select-card { min-height: 44px; }
 }
 
 /* Safe area for notched phones */
@@ -1661,6 +1705,22 @@ body {
   .hero { padding-top: calc(80px + env(safe-area-inset-top)); }
   .dashboard-page { padding-top: calc(90px + env(safe-area-inset-top)); }
   .footer { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+}
+
+/* Landscape phone */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero { min-height: auto; padding: 80px 16px 30px; }
+  .hero h1 { font-size: 1.5rem; }
+  .hero-badge { display: none; }
+  .auth-page { padding: 20px; }
+}
+
+/* Print styles */
+@media print {
+  .navbar, .mobile-menu, .mobile-nav, .btn, .dash-tabs, .toast { display: none !important; }
+  body { background: white; color: black; }
+  .hero { min-height: auto; padding: 20px; }
+  .card, .plan-card, .investment-card { border: 1px solid #ddd; box-shadow: none; }
 }
 
 /* ===================== ANIMATIONS ===================== */
