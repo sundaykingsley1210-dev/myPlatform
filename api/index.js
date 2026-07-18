@@ -446,6 +446,54 @@ app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== PASSWORD RESET REQUESTS =====================
+app.post('/api/forgot-password-request', async (req, res) => {
+  const { identifier } = req.body;
+  if (!identifier) return res.status(400).json({ error: 'Please enter your username or email' });
+  try {
+    let result = await dbQuery('users', 'id, username, email', { username: identifier }, { single: true });
+    if (!result.data) result = await dbQuery('users', 'id, username, email', { email: identifier }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'No account found with that username or email' });
+    const existing = await dbQuery('reset_requests', 'id', { user_id: result.data.id, status: 'pending' }, { single: true });
+    if (existing.data) return res.status(400).json({ error: 'You already have a pending reset request. Please wait for admin to process it.' });
+    await dbInsert('reset_requests', { user_id: result.data.id, username: result.data.username, email: result.data.email, status: 'pending' });
+    res.json({ success: true, message: 'Your password reset request has been sent to admin. Please wait for approval.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/reset-requests', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const status = req.query.status || 'all';
+    const filter = status === 'all' ? {} : { status };
+    const result = await dbQuery('reset_requests', 'id, user_id, username, email, status, created_at', filter, { order: { column: 'created_at', ascending: false } });
+    res.json({ requests: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/approve-reset/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: parseInt(req.params.id) }, { single: true });
+    if (!request.data) return res.status(404).json({ error: 'Request not found' });
+    if (request.data.status !== 'pending') return res.status(400).json({ error: 'Request already processed' });
+    const defaultPass = '123456';
+    const hashed = await bcrypt.hash(defaultPass, 10);
+    await dbUpdate('users', { password: hashed }, { id: request.data.user_id });
+    await dbUpdate('reset_requests', { status: 'approved' }, { id: parseInt(req.params.id) });
+    await dbInsert('notifications', { user_id: request.data.user_id, title: 'Password Reset', message: 'Your password has been reset by admin. Your new default password is 123456. Please login and change it immediately.' });
+    res.json({ success: true, message: `Password reset for ${request.data.username}. Default password: ${defaultPass}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/reject-reset/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: parseInt(req.params.id) }, { single: true });
+    if (!request.data) return res.status(404).json({ error: 'Request not found' });
+    await dbUpdate('reset_requests', { status: 'rejected' }, { id: parseInt(req.params.id) });
+    await dbInsert('notifications', { user_id: request.data.user_id, title: 'Password Reset Denied', message: 'Your password reset request was denied by admin. Please contact support for help.' });
+    res.json({ success: true, message: 'Request rejected' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== SETUP ADMIN =====================
 app.get('/api/setup-admin', async (req, res) => {
   try {
