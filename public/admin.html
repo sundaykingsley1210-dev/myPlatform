@@ -94,6 +94,8 @@
         let html = '';
         data.withdrawals.forEach(w => {
           const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
+          const vat = w.vat_amount || Math.round(Number(w.amount) * 0.10);
+          const credit = w.credit_amount || (Number(w.amount) - vat);
           html += `<div class="investment-card">
             <div class="investment-header">
               <div class="investment-vip"><span style="font-size:1.1rem;font-weight:700;color:var(--primary);">₦${Number(w.amount).toLocaleString()}</span>
@@ -104,6 +106,8 @@
               <div class="invest-detail"><div class="label">Bank</div><div class="val">${w.bank_name}</div></div>
               <div class="invest-detail"><div class="label">Account</div><div class="val">${w.account_number}</div></div>
               <div class="invest-detail"><div class="label">Name</div><div class="val">${w.account_name}</div></div>
+              <div class="invest-detail"><div class="label">VAT (10%)</div><div class="val" style="color:#ef4444;">₦${vat.toLocaleString()}</div></div>
+              <div class="invest-detail"><div class="label">Credit</div><div class="val" style="color:#22c55e;font-weight:700;">₦${credit.toLocaleString()}</div></div>
               <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(w.created_at).toLocaleDateString()}</div></div>
             </div>
             ${w.admin_note ? '<div style="padding:8px 12px;background:rgba(255,215,0,0.05);border-radius:6px;font-size:0.8rem;color:var(--gold);margin-top:12px;"><i class="fas fa-comment"></i> ' + w.admin_note + '</div>' : ''}

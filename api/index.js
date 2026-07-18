@@ -129,9 +129,6 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
   if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
 
   try {
-    const existing = await dbQuery('investments', 'id', { user_id: req.userId, vip_level: parseInt(vipLevel), status: 'active' });
-    if (existing.data && existing.data.length > 0) return res.status(400).json({ error: 'You already have an active investment in this VIP plan' });
-
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 
@@ -238,6 +235,10 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!bankName || !accountNumber || !accountName) return res.status(400).json({ error: 'Bank details required' });
 
+  const VAT_RATE = 0.10;
+  const vatAmount = Math.round(amount * VAT_RATE);
+  const creditAmount = amount - vatAmount;
+
   try {
     const userRes = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
     if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
@@ -253,19 +254,19 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
     if (!allowedDays.has(currentDay)) return res.status(400).json({ error: `Not available today (${currentDay}). Your days: ${[...allowedDays].join(', ')}` });
 
     await dbUpdate('users', { balance: userRes.data.balance - amount }, { id: req.userId });
-    await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending' });
+    await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
 
-    await dbInsert('notifications', { user_id: req.userId, title: 'Withdrawal Submitted', message: `Your withdrawal of ₦${amount.toLocaleString()} has been submitted and is being processed.` });
+    await dbInsert('notifications', { user_id: req.userId, title: 'Withdrawal Submitted', message: `Your withdrawal of ₦${amount.toLocaleString()} has been submitted. VAT (10%): ₦${vatAmount.toLocaleString()}. You will receive: ₦${creditAmount.toLocaleString()}.` });
 
     const newBal = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-    res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted.`, newBalance: newBal.data.balance });
+    res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted. You will receive ₦${creditAmount.toLocaleString()} after 10% VAT.`, newBalance: newBal.data.balance, vatAmount, creditAmount });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/my-withdrawals', requireAuth, async (req, res) => {
   try {
     const result = await dbQuery('withdrawals', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
-    const withdrawals = (result.data || []).map(w => ({ id: w.id, amount: w.amount, bankName: w.bank_name, accountNumber: w.account_number, accountName: w.account_name, status: w.status, adminNote: w.admin_note, createdAt: w.created_at }));
+    const withdrawals = (result.data || []).map(w => ({ id: w.id, amount: w.amount, bankName: w.bank_name, accountNumber: w.account_number, accountName: w.account_name, status: w.status, adminNote: w.admin_note, vatAmount: w.vat_amount, creditAmount: w.credit_amount, createdAt: w.created_at }));
     res.json({ withdrawals });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

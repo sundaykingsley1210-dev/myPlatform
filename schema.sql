@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS withdrawals (
   account_name TEXT DEFAULT '',
   status TEXT DEFAULT 'pending',
   admin_note TEXT DEFAULT '',
+  vat_amount REAL DEFAULT 0,
+  credit_amount REAL DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

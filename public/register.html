@@ -137,12 +137,10 @@
         const data = await res.json();
 
         if (res.ok) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('user', JSON.stringify(data.user));
-          showAlert(data.message, 'success');
+          showAlert('Account created successfully! Redirecting to login...', 'success');
           setTimeout(() => {
-            window.location.href = '/dashboard.html';
-          }, 800);
+            window.location.href = '/login.html';
+          }, 1500);
         } else {
           showAlert(data.error, 'error');
           submitBtn.disabled = false;

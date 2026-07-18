@@ -209,6 +209,7 @@
           <div class="vip-summary-row"><span>Monthly (30 days)</span><span>₦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
           <div class="vip-summary-row"><span>Yearly (365 days)</span><span>₦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
           <div class="vip-summary-row total"><span>Total (2 Years)</span><span>₦${totalEarned.toLocaleString()}</span></div>
+          <div style="padding:10px;margin-top:8px;background:rgba(239,68,68,0.05);border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.15);font-size:0.78rem;color:#ef4444;"><i class="fas fa-receipt"></i> 10% VAT applies on all withdrawals</div>
         </div>
 
         <div style="margin-top:24px;text-align:center;">
@@ -417,11 +418,28 @@
 
       if (!canWithdraw) { formDiv.innerHTML = ''; return; }
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
-        <div class="form-group"><label>Amount</label><input type="number" id="withdrawAmount" placeholder="Enter amount" min="100" max="${userData.balance}"></div>
+        <div class="form-group"><label>Amount</label><input type="number" id="withdrawAmount" placeholder="Enter amount" min="100" max="${userData.balance}" oninput="updateWithdrawPreview()"></div>
+        <div id="withdrawPreview" style="padding:12px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin-bottom:16px;display:none;">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;"><span style="color:var(--text-muted);">Withdrawal Amount</span><span id="previewAmount" style="font-weight:700;">₦0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;border-top:1px solid var(--border);"><span style="color:var(--text-muted);">VAT (10%)</span><span id="previewVat" style="color:#ef4444;font-weight:700;">-₦0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:1rem;border-top:2px solid var(--border);margin-top:4px;"><span style="font-weight:800;">You Will Receive</span><span id="previewCredit" style="color:#22c55e;font-weight:900;">₦0</span></div>
+        </div>
         <div class="form-group"><label>Bank</label><input type="text" id="withdrawBank" placeholder="e.g. GTBank"></div>
         <div class="form-group"><label>Account Number</label><input type="text" id="withdrawAccount" placeholder="10-digit number" maxlength="10"></div>
         <div class="form-group"><label>Account Name</label><input type="text" id="withdrawAccountName" placeholder="Account holder name"></div>
         <button class="btn btn-primary btn-block btn-lg" onclick="submitWithdraw()" id="withdrawBtn"><i class="fas fa-paper-plane"></i> Submit</button></div>`;
+    }
+
+    function updateWithdrawPreview() {
+      const amount = parseFloat(document.getElementById('withdrawAmount').value) || 0;
+      const preview = document.getElementById('withdrawPreview');
+      if (amount <= 0) { preview.style.display = 'none'; return; }
+      preview.style.display = 'block';
+      const vat = Math.round(amount * 0.10);
+      const credit = amount - vat;
+      document.getElementById('previewAmount').textContent = '₦' + amount.toLocaleString();
+      document.getElementById('previewVat').textContent = '-₦' + vat.toLocaleString();
+      document.getElementById('previewCredit').textContent = '₦' + credit.toLocaleString();
     }
 
     async function submitWithdraw() {
@@ -453,7 +471,9 @@
         let html = '<h3 style="margin-bottom:16px;">Withdrawal History</h3>';
         data.withdrawals.forEach(w => {
           const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
-          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
+          const vat = w.vatAmount || Math.round(Number(w.amount) * 0.10);
+          const credit = w.creditAmount || (Number(w.amount) - vat);
+          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): ₦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: ₦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
         });
         list.innerHTML = html;
       } catch (err) {}
