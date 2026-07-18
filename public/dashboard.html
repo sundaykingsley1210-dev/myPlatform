@@ -121,7 +121,20 @@
         loadWithdrawInfo();
         loadNotifications();
         setInterval(loadTaskStatus, 60000);
+        setInterval(refreshWallet, 30000);
       } catch (err) { window.location.href = '/login.html'; }
+    }
+
+    async function refreshWallet() {
+      try {
+        const res = await API('/api/me');
+        if (!res.ok) return;
+        const data = await res.json();
+        userData.balance = data.user.balance;
+        userData.totalEarned = data.user.totalEarned;
+        document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+        document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+      } catch (e) {}
     }
 
     function formatAmount(n) { return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
