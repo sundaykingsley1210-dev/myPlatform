@@ -69,6 +69,9 @@
   </div>
 
   <script>
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
     function checkPasswordStrength() {
       const password = document.getElementById('password').value;
       const fill = document.getElementById('strengthFill');

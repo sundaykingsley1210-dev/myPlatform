@@ -52,6 +52,9 @@
   </div>
 
   <script>
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
     function showAlert(message, type) {
       const box = document.getElementById('alertBox');
       box.className = 'alert alert-' + type;
@@ -88,10 +91,10 @@
         if (res.ok) {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
-          showAlert(data.message, 'success');
+          showAlert('Welcome back, ' + data.user.username + '!', 'success');
           setTimeout(() => {
             window.location.href = '/dashboard.html';
-          }, 800);
+          }, 1500);
         } else {
           showAlert(data.error, 'error');
           submitBtn.disabled = false;
