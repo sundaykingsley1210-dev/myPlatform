@@ -25,7 +25,14 @@ const VIP_PLANS = {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+
+const publicDir = path.join(__dirname, '..', 'public');
+app.use(express.static(publicDir));
+
+// Serve PWA files explicitly for Vercel
+app.get('/manifest.json', (req, res) => res.sendFile(path.join(publicDir, 'manifest.json')));
+app.get('/service-worker.js', (req, res) => res.sendFile(path.join(publicDir, 'service-worker.js')));
+app.get('/icons/:file', (req, res) => res.sendFile(path.join(publicDir, 'icons', req.params.file)));
 
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
