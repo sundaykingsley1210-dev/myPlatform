@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
@@ -132,19 +135,9 @@
         const res = await API('/api/me');
         if (!res.ok) return;
         const data = await res.json();
-        const newBal = data.user.balance;
-        const newEarned = data.user.totalEarned;
-        if (userData.balance !== newBal || userData.totalEarned !== newEarned) {
-          userData.balance = newBal;
-          userData.totalEarned = newEarned;
-          updateStats();
-          document.getElementById('balanceVal').classList.add('pulse');
-          document.getElementById('totalEarnedVal').classList.add('pulse');
-          setTimeout(() => {
-            document.getElementById('balanceVal').classList.remove('pulse');
-            document.getElementById('totalEarnedVal').classList.remove('pulse');
-          }, 600);
-        }
+        userData.balance = data.user.balance;
+        userData.totalEarned = data.user.totalEarned;
+        updateStats();
       } catch (e) {}
     }
 
