@@ -1544,83 +1544,123 @@ body {
 
 /* ===================== RESPONSIVE ===================== */
 @media (max-width: 1024px) {
-  .plans-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .steps-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .footer-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 32px;
-  }
-  .launch-card {
-    grid-template-columns: 1fr;
-  }
-  .dash-stats {
-    grid-template-columns: 1fr;
-  }
-  .investment-details {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .awards-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .vip-select-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .plans-grid { grid-template-columns: repeat(2, 1fr); }
+  .steps-grid { grid-template-columns: repeat(2, 1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+  .launch-card { grid-template-columns: 1fr; }
+  .dash-stats { grid-template-columns: 1fr; }
+  .investment-details { grid-template-columns: repeat(2, 1fr); }
+  .awards-grid { grid-template-columns: repeat(2, 1fr); }
+  .vip-select-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 768px) {
-  .nav-links, .nav-actions {
-    display: none;
-  }
-  .mobile-menu {
-    display: block;
-  }
-  .hero h1 {
-    font-size: 2.2rem;
-  }
-  .hero-stats {
-    flex-direction: column;
-    gap: 24px;
-  }
-  .plans-grid {
-    grid-template-columns: 1fr;
-  }
-  .about-grid {
-    grid-template-columns: 1fr;
-  }
-  .achievements-grid {
-    grid-template-columns: 1fr;
-  }
-  .steps-grid {
-    grid-template-columns: 1fr;
-  }
-  .mission-values {
-    grid-template-columns: 1fr;
-  }
-  .section-header h2 {
-    font-size: 1.8rem;
-  }
-  .launch-card {
-    padding: 32px 24px;
-  }
-  .footer-grid {
-    grid-template-columns: 1fr;
-  }
-  .dash-tabs {
-    overflow-x: auto;
-  }
-  .investment-details {
-    grid-template-columns: 1fr;
-  }
-  .awards-grid {
-    grid-template-columns: 1fr;
-  }
-  .vip-select-grid {
-    grid-template-columns: 1fr;
-  }
+  .nav-links, .nav-actions { display: none; }
+  .mobile-menu { display: block; }
+  .hero h1 { font-size: 2rem; }
+  .hero-text { font-size: 1rem; padding: 0 10px; }
+  .hero-stats { flex-direction: column; gap: 16px; }
+  .hero-cta { flex-direction: column; align-items: center; }
+  .hero-cta .btn { width: 100%; max-width: 300px; justify-content: center; }
+  .plans-grid { grid-template-columns: 1fr; }
+  .about-grid { grid-template-columns: 1fr; gap: 32px; }
+  .about-content h2 { font-size: 1.8rem; }
+  .achievements-grid { grid-template-columns: 1fr; }
+  .steps-grid { grid-template-columns: 1fr; }
+  .mission-values { grid-template-columns: 1fr; }
+  .mission-card { padding: 32px 20px; }
+  .section-header h2 { font-size: 1.6rem; }
+  .section-header p { font-size: 0.9rem; }
+  .launch-card { padding: 24px 16px; }
+  .date-display .day { font-size: 2.5rem; }
+  .date-display .month, .date-display .year { font-size: 1.2rem; }
+  .launch-features { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; gap: 24px; }
+  .cta-card { padding: 40px 20px; }
+  .cta-card h2 { font-size: 1.5rem; }
+  .cta-buttons { flex-direction: column; align-items: center; }
+  .dash-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; padding: 4px; gap: 2px; }
+  .dash-tab { padding: 8px 14px; font-size: 0.78rem; }
+  .investment-details { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .invest-detail { padding: 8px; }
+  .invest-detail .val { font-size: 0.95rem; }
+  .awards-grid { grid-template-columns: 1fr; }
+  .award-item { padding: 12px; }
+  .vip-select-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .vip-select-card { padding: 12px 8px; }
+  .payment-details-box { padding: 16px; }
+  .payment-detail-row { flex-direction: column; gap: 4px; padding: 8px 0; }
+  .auth-card { padding: 32px 20px; margin: 16px; }
+  .withdrawal-card { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+  .container { padding: 0 12px; }
+  .hero { padding: 80px 12px 40px; }
+  .hero h1 { font-size: 1.65rem; line-height: 1.2; }
+  .hero-text { font-size: 0.9rem; }
+  .hero-badge { font-size: 0.75rem; padding: 6px 14px; }
+  .stat-number { font-size: 1.5rem; }
+  .stat-label { font-size: 0.75rem; }
+  .btn-lg { padding: 12px 24px; font-size: 0.9rem; }
+  .btn { padding: 10px 16px; font-size: 0.85rem; }
+  .plans-section, .how-it-works, .about-section, .achievements-section, .launch-section, .cta-section { padding: 60px 0; }
+  .section-header { margin-bottom: 32px; }
+  .section-header h2 { font-size: 1.4rem; }
+  .plan-card { padding: 24px 16px; }
+  .plan-amount .amount { font-size: 1.6rem; }
+  .plan-daily { font-size: 0.85rem; padding: 10px; }
+  .step { padding: 24px 16px; }
+  .about-content p { font-size: 0.9rem; }
+  .about-feature { padding: 12px 0; }
+  .achievement-card { padding: 20px 16px; }
+  .achievement-card h3 { font-size: 1rem; }
+  .achievement-card p { font-size: 0.82rem; }
+  .launch-content h2 { font-size: 1.5rem; }
+  .launch-content > p { font-size: 0.9rem; }
+  .launch-visual h3 { font-size: 1rem; }
+  .dash-stats { gap: 12px; }
+  .dash-stat-card { padding: 16px; }
+  .dash-stat-card .value { font-size: 1.4rem; }
+  .investment-card { padding: 16px; }
+  .investment-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .investment-details { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .invest-detail .label { font-size: 0.7rem; }
+  .invest-detail .val { font-size: 0.85rem; }
+  .claim-btn-container .btn { width: 100%; font-size: 0.82rem; padding: 10px 14px; }
+  .vip-select-grid { grid-template-columns: 1fr; }
+  .form-group input { padding: 11px 14px; font-size: 0.9rem; }
+  .auth-card { padding: 24px 16px; }
+  .auth-card h2 { font-size: 1.3rem; }
+  .footer-bottom p { font-size: 0.72rem; }
+  .toast { left: 12px; right: 12px; bottom: 12px; font-size: 0.82rem; text-align: center; }
+}
+
+@media (max-width: 360px) {
+  .hero h1 { font-size: 1.45rem; }
+  .hero-text { font-size: 0.82rem; }
+  .plans-grid { gap: 12px; }
+  .plan-card { padding: 20px 12px; }
+  .section-header h2 { font-size: 1.25rem; }
+  .dash-tab { padding: 7px 10px; font-size: 0.72rem; }
+  .stat-number { font-size: 1.3rem; }
+}
+
+/* Touch-friendly tap targets */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+  .dash-tab { min-height: 40px; }
+  .plan-card .btn { min-height: 44px; }
+  .claim-btn-container .btn { min-height: 44px; }
+  .mobile-menu { min-height: 44px; min-width: 44px; }
+}
+
+/* Safe area for notched phones */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .navbar { padding-top: env(safe-area-inset-top); }
+  .hero { padding-top: calc(80px + env(safe-area-inset-top)); }
+  .dashboard-page { padding-top: calc(90px + env(safe-area-inset-top)); }
+  .footer { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
 }
 
 /* ===================== ANIMATIONS ===================== */
