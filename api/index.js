@@ -438,8 +438,9 @@ app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (r
 app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await dbQuery('users', 'is_admin', { id: parseInt(id) }, { single: true });
+    const user = await dbQuery('users', 'is_admin, username', { id: parseInt(id) }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
+    if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot change admin status of the main admin account' });
     await dbUpdate('users', { is_admin: !user.data.is_admin }, { id: parseInt(id) });
     res.json({ success: true, message: 'Admin status toggled' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -450,12 +451,14 @@ app.get('/api/setup-admin', async (req, res) => {
   try {
     const result = await dbQuery('users', 'id, is_admin', { username: 'admin' }, { single: true });
     if (result.data) {
-      if (!result.data.is_admin) {
-        await dbUpdate('users', { is_admin: true }, { username: 'admin' });
-      }
+      const updates = {};
+      if (!result.data.is_admin) updates.is_admin = true;
+      await dbUpdate('users', updates, { username: 'admin' });
       res.json({ success: true, message: 'Admin account is ready. Username: admin' });
     } else {
-      res.json({ success: false, message: 'No admin user found. Register first.' });
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await dbInsert('users', { username: 'admin', password: hashedPassword, email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
+      res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -736,6 +739,8 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
 
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
   const { nickname, email, phone } = req.body;
+  const target = await dbQuery('users', 'username', { id: parseInt(req.params.id) }, { single: true });
+  if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot edit the main admin account' });
   const allowedFields = {};
   if (nickname !== undefined) allowedFields.nickname = nickname;
   if (email !== undefined) allowedFields.email = email;
@@ -752,6 +757,7 @@ app.post('/api/admin/reset-password/:id', requireAuth, requireAdmin, async (req,
   try {
     const user = await dbQuery('users', 'id, username', { id: parseInt(req.params.id) }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
+    if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot reset the main admin password' });
     const hashed = await bcrypt.hash(newPassword, 10);
     await dbUpdate('users', { password: hashed }, { id: parseInt(req.params.id) });
     await dbInsert('notifications', { user_id: parseInt(req.params.id), title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
@@ -794,6 +800,8 @@ app.post('/api/admin/clear-all', requireAuth, requireAdmin, async (req, res) => 
 app.post('/api/admin/delete-user/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
+    const target = await dbQuery('users', 'username', { id: userId }, { single: true });
+    if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot delete the main admin account' });
     if (isSupabase()) {
       const { supabase } = require('../database');
       const sb = supabase();

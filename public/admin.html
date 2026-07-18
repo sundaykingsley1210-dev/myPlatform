@@ -195,7 +195,7 @@
               <button class="btn btn-outline btn-sm" onclick="editUser(${u.id},'${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
               <button class="btn btn-outline btn-sm" onclick="resetUserPassword(${u.id},'${displayName}')" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-key"></i> Reset Password</button>
               <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${displayName}')"><i class="fas fa-trash"></i> Delete</button>
-            </div>` : ''}
+            </div>` : `<div style="margin-top:12px;text-align:center;"><span style="color:var(--primary);font-size:0.82rem;"><i class="fas fa-shield-alt"></i> Protected — admin account cannot be edited or deleted</span></div>`}
           </div>`;
         });
         list.innerHTML = html;
