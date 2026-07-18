@@ -45,6 +45,7 @@
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
         <button class="dash-tab" onclick="switchTab('data',this)"><i class="fas fa-database"></i> Data</button>
         <button class="dash-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
+        <button class="dash-tab" onclick="switchTab('settings',this)"><i class="fas fa-cog"></i> Settings</button>
       </div>
 
       <div class="dash-panel active" id="panel-activity"><div id="activityLog"></div></div>
@@ -54,6 +55,7 @@
       <div class="dash-panel" id="panel-support"><div id="supportList"></div></div>
       <div class="dash-panel" id="panel-data"><div id="dataManage"></div></div>
       <div class="dash-panel" id="panel-users"><div id="usersList"></div></div>
+      <div class="dash-panel" id="panel-settings"><div id="settingsArea"></div></div>
     </div>
   </div>
 
@@ -82,6 +84,7 @@
       if (tab === 'support') loadAdminSupport();
       if (tab === 'data') loadDataManage();
       if (tab === 'activity') loadActivityLog();
+      if (tab === 'settings') loadSettings();
     }
 
     async function loadStats() {
@@ -408,6 +411,66 @@
         if (res.ok) { showToast(data.message, 'success'); loadUsers(); loadStats(); }
         else showToast(data.error, 'error');
       } catch (err) { showToast('Failed', 'error'); }
+    }
+
+    function loadSettings() {
+      const area = document.getElementById('settingsArea');
+      const user = JSON.parse(localStorage.getItem('user') || '{}');
+      area.innerHTML = `<div class="vip-detail-card">
+        <h3 style="margin-bottom:20px;"><i class="fas fa-cog" style="color:var(--primary);margin-right:8px;"></i> Admin Settings</h3>
+        <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:20px;">
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Logged in as</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">${user.username || 'Admin'}</div>
+        </div>
+        <h4 style="margin:16px 0 12px;"><i class="fas fa-lock" style="color:var(--gold);margin-right:6px;"></i> Change Password</h4>
+        <div class="form-group">
+          <label>Current Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="adminCurrentPass" placeholder="Enter current password" autocomplete="current-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('adminCurrentPass',this)"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="adminNewPass" placeholder="Min 6 characters" autocomplete="new-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('adminNewPass',this)"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Confirm New Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="adminConfirmPass" placeholder="Confirm new password" autocomplete="new-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('adminConfirmPass',this)"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="changeAdminPassword()" id="adminPassBtn"><i class="fas fa-save"></i> Update Password</button>
+      </div>`;
+    }
+
+    async function changeAdminPassword() {
+      const current = document.getElementById('adminCurrentPass').value;
+      const newPass = document.getElementById('adminNewPass').value;
+      const confirm = document.getElementById('adminConfirmPass').value;
+      if (!current || !newPass || !confirm) return showToast('Fill all fields', 'error');
+      if (newPass.length < 6) return showToast('Min 6 characters', 'error');
+      if (newPass !== confirm) return showToast('Passwords do not match', 'error');
+      const btn = document.getElementById('adminPassBtn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Updating...';
+      try {
+        const res = await API('/api/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: current, newPassword: newPass }) });
+        const data = await res.json();
+        if (res.ok) { showToast('Password changed! Please login again.', 'success'); setTimeout(() => { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login.html'; }, 2000); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Update Password';
+    }
+
+    function togglePass(id, btn) {
+      const inp = document.getElementById(id);
+      const icon = btn.querySelector('i');
+      if (inp.type === 'password') { inp.type = 'text'; icon.className = 'fas fa-eye-slash'; }
+      else { inp.type = 'password'; icon.className = 'fas fa-eye'; }
     }
 
     function showToast(message, type) {
