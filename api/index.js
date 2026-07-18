@@ -393,7 +393,9 @@ app.get('/api/migrate', async (req, res) => {
     const { supabase } = require('../database');
     const sb = supabase();
     const results = [];
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0' }); results.push('vip_level added'); } catch (e) { results.push('vip_level: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0' }); results.push('transactions.vip_level added'); } catch (e) { results.push('transactions.vip_level: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS vat_amount REAL DEFAULT 0' }); results.push('withdrawals.vat_amount added'); } catch (e) { results.push('withdrawals.vat_amount: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS credit_amount REAL DEFAULT 0' }); results.push('withdrawals.credit_amount added'); } catch (e) { results.push('withdrawals.credit_amount: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
