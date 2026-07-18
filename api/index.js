@@ -453,6 +453,7 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.from('notifications').delete().neq('id', 0); results.push('notifications cleared'); } catch (e) { results.push('clear notifications: ' + e.message); }
     try { await sb.from('messages').delete().neq('id', 0); results.push('messages cleared'); } catch (e) { results.push('clear messages: ' + e.message); }
     try { await sb.from('investments').delete().neq('id', 0); results.push('investments cleared'); } catch (e) { results.push('clear investments: ' + e.message); }
+    try { await sb.from('users').delete().neq('id', 0); results.push('users cleared'); } catch (e) { results.push('clear users: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
