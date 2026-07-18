@@ -101,7 +101,7 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
   try {
-    const result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin', { username }, { single: true });
+    const result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { username }, { single: true });
     if (!result.data) return res.status(400).json({ error: 'Invalid username or password' });
 
     const user = result.data;
@@ -109,7 +109,7 @@ app.post('/api/login', async (req, res) => {
     if (!valid) return res.status(400).json({ error: 'Invalid username or password' });
 
     const token = generateToken(user);
-    res.json({ success: true, message: 'Login successful!', token, user: { id: user.id, username: user.username, balance: user.balance, totalEarned: user.total_earned, isAdmin: user.is_admin } });
+    res.json({ success: true, message: 'Login successful!', token, user: { id: user.id, username: user.username, balance: user.balance, totalEarned: user.total_earned, isAdmin: user.is_admin, nickname: user.nickname, avatarUrl: user.avatar_url } });
   } catch (err) {
     res.status(500).json({ error: 'Login failed: ' + err.message });
   }
@@ -117,10 +117,10 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin', { id: req.userId }, { single: true });
+    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin, nickname, avatar_url', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin, nickname: u.nickname, avatarUrl: u.avatar_url } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -433,6 +433,8 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT \'\'' }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT DEFAULT \'\'' }); results.push('users.reset_code added'); } catch (e) { results.push('users.reset_code: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TEXT DEFAULT \'\'' }); results.push('users.reset_expires added'); } catch (e) { results.push('users.reset_expires: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT DEFAULT \'\'' }); results.push('users.nickname added'); } catch (e) { results.push('users.nickname: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\'' }); results.push('users.avatar_url added'); } catch (e) { results.push('users.avatar_url: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
     try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
@@ -447,17 +449,17 @@ app.get('/api/migrate', async (req, res) => {
 // ===================== PROFILE SETTINGS =====================
 app.get('/api/profile', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, email, phone, full_name, balance, total_earned, referral_code, created_at', { id: req.userId }, { single: true });
+    const result = await dbQuery('users', 'id, username, email, phone, full_name, balance, total_earned, referral_code, created_at, nickname, avatar_url', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, email: u.email, phone: u.phone, fullName: u.full_name, balance: u.balance, totalEarned: u.total_earned, referralCode: u.referral_code, createdAt: u.created_at } });
+    res.json({ user: { id: u.id, username: u.username, email: u.email, phone: u.phone, fullName: u.full_name, balance: u.balance, totalEarned: u.total_earned, referralCode: u.referral_code, createdAt: u.created_at, nickname: u.nickname, avatarUrl: u.avatar_url } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/profile', requireAuth, async (req, res) => {
-  const { email, phone, fullName } = req.body;
+  const { email, phone, fullName, nickname, avatarUrl } = req.body;
   try {
-    await dbUpdate('users', { email: email || '', phone: phone || '', full_name: fullName || '' }, { id: req.userId });
+    await dbUpdate('users', { email: email || '', phone: phone || '', full_name: fullName || '', nickname: nickname || '', avatar_url: avatarUrl || '' }, { id: req.userId });
     res.json({ success: true, message: 'Profile updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -584,6 +586,55 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
   try {
     const result = await dbQuery('investments', '*', { user_id: parseInt(req.params.userId) }, { order: { column: 'created_at', ascending: false } });
     res.json({ investments: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== ADMIN ACTIVITY LOG =====================
+app.get('/api/admin/activity-log', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const allActivities = [];
+    const users = await dbQuery('users', 'id, username, nickname');
+    const userMap = {};
+    (users.data || []).forEach(u => { userMap[u.id] = u.nickname || u.username; });
+
+    const investments = await dbQuery('investments', 'id, user_id, vip_level, amount, status, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
+    (investments.data || []).forEach(i => {
+      allActivities.push({ type: 'investment', user: userMap[i.user_id] || 'User #' + i.user_id, detail: `VIP ${i.vip_level} — ₦${Number(i.amount).toLocaleString()}`, status: i.status, time: i.created_at });
+    });
+
+    const withdrawals = await dbQuery('withdrawals', 'id, user_id, amount, status, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
+    (withdrawals.data || []).forEach(w => {
+      allActivities.push({ type: 'withdrawal', user: userMap[w.user_id] || 'User #' + w.user_id, detail: `₦${Number(w.amount).toLocaleString()}`, status: w.status, time: w.created_at });
+    });
+
+    const taskClaims = await dbQuery('task_claims', 'id, user_id, investment_id, amount, claim_date', {}, { order: { column: 'claim_date', ascending: false }, limit: 50 });
+    (taskClaims.data || []).forEach(t => {
+      allActivities.push({ type: 'task_claim', user: userMap[t.user_id] || 'User #' + t.user_id, detail: `₦${Number(t.amount).toLocaleString()} on ${t.claim_date}`, status: 'completed', time: t.claim_date });
+    });
+
+    const messages = await dbQuery('messages', 'id, user_id, sender, message, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
+    (messages.data || []).forEach(m => {
+      allActivities.push({ type: 'message', user: userMap[m.user_id] || 'User #' + m.user_id, detail: (m.sender === 'admin' ? 'Admin' : 'User') + ': ' + m.message.substring(0, 80), status: m.sender, time: m.created_at });
+    });
+
+    allActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
+    res.json({ activities: allActivities.slice(0, 100) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== ADMIN ADD BALANCE =====================
+app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, amount } = req.body;
+  if (!userId || !amount || amount <= 0) return res.status(400).json({ error: 'userId and positive amount required' });
+  try {
+    const user = await dbQuery('users', 'id, balance, total_earned', { id: parseInt(userId) }, { single: true });
+    if (!user.data) return res.status(404).json({ error: 'User not found' });
+    const newBal = user.data.balance + parseFloat(amount);
+    const newEarned = user.data.total_earned + parseFloat(amount);
+    await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: parseInt(userId) });
+    await dbInsert('transactions', { user_id: parseInt(userId), type: 'admin_credit', vip_level: 0, amount: parseFloat(amount), status: 'completed', reference: 'ADMIN-' + Date.now(), bank_name: '', account_number: '', account_name: '' });
+    await dbInsert('notifications', { user_id: parseInt(userId), title: 'Balance Credited', message: `Admin credited ₦${parseFloat(amount).toLocaleString()} to your wallet.` });
+    res.json({ success: true, message: `₦${parseFloat(amount).toLocaleString()} added to user's wallet` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

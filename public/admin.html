@@ -38,7 +38,8 @@
       </div>
 
       <div class="dash-tabs">
-        <button class="dash-tab active" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals</button>
+        <button class="dash-tab active" onclick="switchTab('activity',this)"><i class="fas fa-clock-rotate-left"></i> Activity</button>
+        <button class="dash-tab" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals</button>
         <button class="dash-tab" onclick="switchTab('transactions',this)"><i class="fas fa-exchange-alt"></i> Transactions</button>
         <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
@@ -46,7 +47,8 @@
         <button class="dash-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
       </div>
 
-      <div class="dash-panel active" id="panel-withdrawals"><div id="withdrawalsList"></div></div>
+      <div class="dash-panel active" id="panel-activity"><div id="activityLog"></div></div>
+      <div class="dash-panel" id="panel-withdrawals"><div id="withdrawalsList"></div></div>
       <div class="dash-panel" id="panel-transactions"><div id="transactionsList"></div></div>
       <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
       <div class="dash-panel" id="panel-support"><div id="supportList"></div></div>
@@ -79,6 +81,7 @@
       if (tab === 'investments') loadAdminInvestments();
       if (tab === 'support') loadAdminSupport();
       if (tab === 'data') loadDataManage();
+      if (tab === 'activity') loadActivityLog();
     }
 
     async function loadStats() {
@@ -157,11 +160,12 @@
         if (!data.users || !data.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>No Users</h3></div>'; return; }
         let html = '';
         data.users.forEach(u => {
+          const displayName = u.nickname || u.username;
           html += `<div class="investment-card">
             <div class="investment-header">
-              <div class="investment-vip"><span style="font-weight:700;">${u.username}</span>
+              <div class="investment-vip"><span style="font-weight:700;">${displayName}</span>
               ${u.is_admin ? '<span class="status-badge" style="background:rgba(0,87,255,0.1);color:var(--primary);border:1px solid rgba(0,87,255,0.2);">ADMIN</span>' : ''}</div>
-              <span style="font-size:0.8rem;color:var(--text-muted);">ID: ${u.id}</span>
+              <span style="font-size:0.8rem;color:var(--text-muted);">ID: ${u.id} ${u.nickname ? '(@' + u.username + ')' : ''}</span>
             </div>
             <div class="investment-details">
               <div class="invest-detail"><div class="label">Balance</div><div class="val primary">₦${Number(u.balance).toLocaleString()}</div></div>
@@ -169,6 +173,10 @@
               <div class="invest-detail"><div class="label">Joined</div><div class="val">${new Date(u.created_at).toLocaleDateString()}</div></div>
               <div class="invest-detail"><div class="label">Email</div><div class="val">${u.email || 'N/A'}</div></div>
             </div>
+            ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+              <button class="btn btn-accent btn-sm" onclick="creditBalance(${u.id},'${displayName}')"><i class="fas fa-plus-circle"></i> Credit Balance</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${displayName}')"><i class="fas fa-trash"></i> Delete</button>
+            </div>` : ''}
           </div>`;
         });
         list.innerHTML = html;
@@ -217,7 +225,6 @@
             <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(tx.created_at).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">VIP Level</div><div class="val">${tx.vip_level ? 'VIP ' + tx.vip_level : 'N/A'}</div></div>
             </div>
-            ${!u.is_admin ? '<div style="margin-top:12px;text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ',\'' + u.username + '\')"><i class="fas fa-trash"></i> Delete User</button></div>' : ''}
           </div>`;
       });
       inner.innerHTML = html;
@@ -269,16 +276,21 @@
         const list = document.getElementById('supportList');
         if (!data.messages || !data.messages.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-headset"></i><h3>No Messages</h3><p>User support messages will appear here</p></div>'; return; }
         const grouped = {};
+        const userNames = {};
         data.messages.forEach(m => {
           if (!grouped[m.user_id]) grouped[m.user_id] = [];
           grouped[m.user_id].push(m);
         });
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        (usersData.users || []).forEach(u => { userNames[u.id] = u.nickname || u.username; });
         let html = '';
         for (const [userId, msgs] of Object.entries(grouped)) {
           const lastMsg = msgs[msgs.length - 1];
+          const displayName = userNames[userId] || 'User #' + userId;
           html += `<div class="investment-card" style="margin-bottom:12px;">
             <div class="investment-header">
-              <div class="investment-vip"><span style="font-weight:700;"><i class="fas fa-user"></i> User ID: ${userId}</span>
+              <div class="investment-vip"><span style="font-weight:700;"><i class="fas fa-user"></i> ${displayName}</span>
               <span style="font-size:0.75rem;color:var(--text-muted);">${msgs.length} messages</span></div>
               <span style="font-size:0.8rem;color:var(--text-muted);">${new Date(lastMsg.created_at).toLocaleString()}</span>
             </div>
@@ -361,6 +373,43 @@
       } catch (err) { showToast('Failed', 'error'); }
     }
 
+    async function loadActivityLog() {
+      try {
+        const res = await API('/api/admin/activity-log');
+        const data = await res.json();
+        const area = document.getElementById('activityLog');
+        if (!data.activities || !data.activities.length) { area.innerHTML = '<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><h3>No Activity Yet</h3><p>Platform activity will appear here in real-time</p></div>'; return; }
+        let html = '<div style="margin-bottom:16px;"><p style="color:var(--text-secondary);font-size:0.85rem;">Showing latest 100 activities across the platform</p></div>';
+        const typeIcons = { investment: 'fa-arrow-trend-up', withdrawal: 'fa-money-bill-wave', task_claim: 'fa-list-check', message: 'fa-comment' };
+        const typeColors = { investment: '#22c55e', withdrawal: '#f59e0b', task_claim: '#0057ff', message: '#a855f7' };
+        data.activities.forEach(a => {
+          const icon = typeIcons[a.type] || 'fa-circle';
+          const color = typeColors[a.type] || '#666';
+          const statusColor = a.status === 'completed' || a.status === 'user' ? '#22c55e' : a.status === 'pending' ? '#f59e0b' : a.status === 'admin' ? '#0057ff' : '#666';
+          html += `<div style="padding:12px 16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);border-left:3px solid ${color};margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;border-radius:50%;background:${color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas ${icon}" style="color:${color};font-size:0.85rem;"></i></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.85rem;font-weight:600;">${a.user} <span style="color:var(--text-muted);font-weight:400;">${a.detail}</span></div>
+              <div style="font-size:0.7rem;color:var(--text-muted);">${a.type.replace('_', ' ')} — ${new Date(a.time).toLocaleString()}</div>
+            </div>
+            <span class="status-badge" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}33;font-size:0.7rem;">${a.status}</span>
+          </div>`;
+        });
+        area.innerHTML = html;
+      } catch (err) { document.getElementById('activityLog').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    async function creditBalance(userId, username) {
+      const amount = prompt('Enter amount to credit to ' + username + ':');
+      if (!amount || isNaN(amount) || parseFloat(amount) <= 0) return;
+      try {
+        const res = await API('/api/admin/add-balance', { method: 'POST', body: JSON.stringify({ userId, amount: parseFloat(amount) }) });
+        const data = await res.json();
+        if (res.ok) { showToast(data.message, 'success'); loadUsers(); loadStats(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+    }
+
     function showToast(message, type) {
       const t = document.createElement('div');
       t.className = 'toast ' + type; t.textContent = message;
@@ -376,7 +425,7 @@
         const data = await res.json();
         if (!data.user.isAdmin) { window.location.href = '/dashboard.html'; return; }
         loadStats();
-        loadWithdrawals();
+        loadActivityLog();
       } catch (err) { window.location.href = '/login.html'; }
     }
 

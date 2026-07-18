@@ -18,7 +18,7 @@
     <div class="nav-container">
       <a href="/" class="logo"><i class="fas fa-gem"></i> Enrich <span>U</span></a>
       <div class="nav-actions">
-        <span id="userGreeting" style="color:var(--text-secondary);font-size:0.9rem;margin-right:8px;"></span>
+        <span id="userGreeting" style="color:var(--text-secondary);font-size:0.9rem;margin-right:8px;display:flex;align-items:center;gap:6px;"></span>
         <a href="/admin.html" class="btn btn-outline" id="adminLink" style="display:none;"><i class="fas fa-shield-halved"></i> Admin</a>
         <a href="#" class="btn btn-outline" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
       </div>
@@ -106,8 +106,13 @@
         if (!res.ok) { window.location.href = '/login.html'; return; }
         const data = await res.json();
         userData = data.user;
-        document.getElementById('userGreeting').textContent = 'Hi, ' + userData.username;
-        document.getElementById('dashTitle').textContent = 'Welcome back, ' + userData.username + '!';
+        const displayName = userData.nickname || userData.username;
+        if (userData.avatarUrl) {
+          document.getElementById('userGreeting').innerHTML = '<img src="' + userData.avatarUrl + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);" onerror="this.style.display=\'none\'"> Hi, ' + displayName;
+        } else {
+          document.getElementById('userGreeting').textContent = 'Hi, ' + displayName;
+        }
+        document.getElementById('dashTitle').textContent = 'Welcome back, ' + displayName + '!';
         if (userData.isAdmin) document.getElementById('adminLink').style.display = '';
         updateStats();
         loadVipPlans();
@@ -650,6 +655,11 @@
         const u = data.user;
         area.innerHTML = `<div class="vip-detail-card">
           <h3 style="margin-bottom:20px;"><i class="fas fa-user-circle" style="color:var(--primary);margin-right:8px;"></i> My Profile</h3>
+          <div style="text-align:center;margin-bottom:20px;">
+            ${u.avatarUrl ? '<img src="' + u.avatarUrl + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary);margin-bottom:8px;" onerror="this.style.display=\'none\'">' : '<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:2rem;color:white;font-weight:900;">' + (u.nickname || u.username).charAt(0).toUpperCase() + '</div>'}
+            <div style="font-size:1.1rem;font-weight:700;">${u.nickname || u.username}</div>
+            ${u.nickname ? '<div style="font-size:0.8rem;color:var(--text-muted);">@' + u.username + '</div>' : ''}
+          </div>
           <div style="display:grid;gap:16px;">
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
               <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Username</div>
@@ -669,6 +679,8 @@
             </div>
           </div>
           <h4 style="margin:24px 0 16px;">Update Info</h4>
+          <div class="form-group"><label>Nickname (optional)</label><input type="text" id="profileNickname" value="${u.nickname || ''}" placeholder="Display name on dashboard"></div>
+          <div class="form-group"><label>Profile Picture URL (optional)</label><input type="url" id="profileAvatar" value="${u.avatarUrl || ''}" placeholder="https://example.com/photo.jpg"></div>
           <div class="form-group"><label>Full Name</label><input type="text" id="profileName" value="${u.fullName || ''}" placeholder="Your full name"></div>
           <div class="form-group"><label>Email</label><input type="email" id="profileEmail" value="${u.email || ''}" placeholder="your@email.com"></div>
           <div class="form-group"><label>Phone</label><input type="tel" id="profilePhone" value="${u.phone || ''}" placeholder="Phone number"></div>
@@ -688,7 +700,9 @@
         const res = await API('/api/profile', { method: 'PUT', body: JSON.stringify({
           fullName: document.getElementById('profileName').value,
           email: document.getElementById('profileEmail').value,
-          phone: document.getElementById('profilePhone').value
+          phone: document.getElementById('profilePhone').value,
+          nickname: document.getElementById('profileNickname').value,
+          avatarUrl: document.getElementById('profileAvatar').value
         })});
         const data = await res.json();
         if (res.ok) showToast('Profile updated', 'success');
