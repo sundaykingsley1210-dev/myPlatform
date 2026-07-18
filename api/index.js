@@ -191,8 +191,9 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
     if (tx.status === 'completed') return res.json({ success: true, message: 'Payment already verified' });
 
     const plan = VIP_PLANS[tx.vip_level];
+    const userLocation = NG_LOCATIONS[req.userId % NG_LOCATIONS.length];
     await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
-    await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active' });
+    await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
 
     await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: `Your VIP ${tx.vip_level} investment of ₦${tx.amount.toLocaleString()} is now active. Start collecting daily returns!` });
 
@@ -481,6 +482,7 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TEXT DEFAULT \'\'' }); results.push('users.reset_expires added'); } catch (e) { results.push('users.reset_expires: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT DEFAULT \'\'' }); results.push('users.nickname added'); } catch (e) { results.push('users.nickname: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\'' }); results.push('users.avatar_url added'); } catch (e) { results.push('users.avatar_url: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
     try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
@@ -745,6 +747,24 @@ app.post('/api/admin/delete-user/:id', requireAuth, requireAdmin, async (req, re
       await sb.from('users').delete().eq('id', userId);
     }
     res.json({ success: true, message: 'User and all related data deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== INVESTMENT POP-UP NOTIFICATIONS =====================
+const NG_LOCATIONS = ['Lagos','Abuja','Rivers','Kano','Oyo','Delta','Enugu','Anambra','Imo','Abia','Akwa Ibom','Cross River','Edo','Ondo','Osun','Ogun','Ekiti','Kwara','Kogi','Benue','Nasarawa','Plateau','Taraba','Adamawa','Borno','Yobe','Gombe','Bauchi','Sokoto','Zamfara','Kebbi','Katsina','Jigawa','Kaduna','Niger','Bayelsa'];
+
+app.get('/api/real-investments', requireAuth, async (req, res) => {
+  try {
+    const since = parseInt(req.query.since) || 0;
+    const result = await dbQuery('investments', 'id, user_id, vip_level, amount, created_at', { id: { op: 'gt', val: since } }, { order: { column: 'id', ascending: false }, limit: 10 });
+    const investments = [];
+    for (const inv of (result.data || [])) {
+      const user = await dbQuery('users', 'id, username, nickname', { id: inv.user_id }, { single: true });
+      const name = user.data?.nickname || user.data?.username || 'A user';
+      const location = NG_LOCATIONS[inv.user_id % NG_LOCATIONS.length];
+      investments.push({ id: inv.id, name, vip_level: inv.vip_level, amount: inv.amount, location, created_at: inv.created_at });
+    }
+    res.json({ investments });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
