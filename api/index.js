@@ -379,6 +379,17 @@ app.get('/api/setup-admin', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/migrate', async (req, res) => {
+  try {
+    if (!isSupabase()) return res.json({ success: false, message: 'Not using Supabase' });
+    const { supabase } = require('../database');
+    const sb = supabase();
+    const results = [];
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0' }); results.push('vip_level added'); } catch (e) { results.push('vip_level: ' + e.message); }
+    res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== HTML ROUTES =====================
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'register.html')));
