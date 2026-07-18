@@ -7,10 +7,14 @@ const { initDatabase, dbQuery, dbInsert, dbUpdate, isSupabase } = require('../da
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'enrich-u-jwt-secret-2026';
-const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || 'MK_TEST_AT2CBMNZX6';
-const MONNIFY_SECRET = process.env.MONNIFY_SECRET || '9VCCTEUUY5J63TJUGP8DN7ENLAP13WYC';
-const MONNIFY_BASE_URL = 'https://api.monnify.com';
+const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || '';
+const MONNIFY_SECRET = process.env.MONNIFY_SECRET || '';
+const MONNIFY_CONTRACT_CODE = process.env.MONNIFY_CONTRACT_CODE || '';
+const MONNIFY_BASE_URL = process.env.MONNIFY_BASE_URL || 'https://api.monnify.com';
 const SITE_URL = process.env.SITE_URL || 'https://myplatform-seven.vercel.app';
+const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.10');
+
+const monnifyConfigured = MONNIFY_API_KEY && MONNIFY_SECRET;
 
 const VIP_PLANS = {
   1: { amount: 9000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
@@ -132,19 +136,21 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 
-    try {
-      const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
-        headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
-      });
-      if (tokenRes.data?.responseBody?.accessToken) {
-        const accRes = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
-          accountReference: ref, accountName: `EnrichU-${req.username}`, currencyCode: 'NGN',
-          contractCode: MONNIFY_API_KEY, customerEmail: `${req.username}@enrichu.com`,
-          customerName: req.username, bvn: '00000000000', redirectUrl: `${SITE_URL}/dashboard.html`
-        }, { headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}`, 'Content-Type': 'application/json' } });
-        if (accRes.data?.responseBody) accountDetails = accRes.data.responseBody;
-      }
-    } catch (e) { console.log('Monnify mock mode'); }
+    if (monnifyConfigured) {
+      try {
+        const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
+          headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
+        });
+        if (tokenRes.data?.responseBody?.accessToken) {
+          const accRes = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
+            accountReference: ref, accountName: `EnrichU-${req.username}`, currencyCode: 'NGN',
+            contractCode: MONNIFY_CONTRACT_CODE || MONNIFY_API_KEY, customerEmail: `${req.username}@enrichu.com`,
+            customerName: req.username, bvn: '00000000000', redirectUrl: `${SITE_URL}/dashboard.html`
+          }, { headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}`, 'Content-Type': 'application/json' } });
+          if (accRes.data?.responseBody) accountDetails = accRes.data.responseBody;
+        }
+      } catch (e) { console.log('Monnify API error:', e.message); }
+    }
 
     if (!accountDetails) {
       const banks = ['Wema Bank', 'Sterling Bank', 'Kuda Bank', 'VBank'];
@@ -235,7 +241,6 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
   if (!bankName || !accountNumber || !accountName) return res.status(400).json({ error: 'Bank details required' });
 
-  const VAT_RATE = 0.10;
   const vatAmount = Math.round(amount * VAT_RATE);
   const creditAmount = amount - vatAmount;
 
@@ -385,6 +390,15 @@ app.get('/api/setup-admin', async (req, res) => {
       res.json({ success: false, message: 'No admin user found' });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/config-status', (req, res) => {
+  res.json({
+    monnify: monnifyConfigured ? 'configured' : 'not configured',
+    vatRate: (VAT_RATE * 100) + '%',
+    siteUrl: SITE_URL,
+    monnifyUrl: MONNIFY_BASE_URL
+  });
 });
 
 app.get('/api/migrate', async (req, res) => {
