@@ -14,9 +14,10 @@ const mem = {
   withdrawals: [],
   task_claims: [],
   notifications: [],
-  messages: []
+  messages: [],
+  reset_requests: []
 };
-let nextId = { users: 1, investments: 1, transactions: 1, withdrawals: 1, task_claims: 1, notifications: 1, messages: 1 };
+let nextId = { users: 1, investments: 1, transactions: 1, withdrawals: 1, task_claims: 1, notifications: 1, messages: 1, reset_requests: 1 };
 
 function initDatabase() {
   if (SUPABASE_URL && SUPABASE_KEY) {
@@ -118,7 +119,14 @@ async function dbQuery(table, columns = '*', filters = {}, options = {}) {
   if (options.order) query = query.order(options.order.column, { ascending: options.order.ascending ?? false });
   if (options.limit) query = query.limit(options.limit);
   if (options.single) query = query.single();
-  return query;
+  const result = await query;
+  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+    console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
+    const memResult = memSelect(table, columns, filters, options);
+    if (options.single) return { data: memResult, error: null };
+    return { data: memResult || [], error: null };
+  }
+  return result;
 }
 
 async function dbInsert(table, data) {
@@ -126,7 +134,13 @@ async function dbInsert(table, data) {
     const row = memInsert(table, data);
     return { data: [row], error: null };
   }
-  return supabase.from(table).insert(data).select();
+  const result = await supabase.from(table).insert(data).select();
+  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+    console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
+    const row = memInsert(table, data);
+    return { data: [row], error: null };
+  }
+  return result;
 }
 
 async function dbUpdate(table, data, filters) {
@@ -136,7 +150,13 @@ async function dbUpdate(table, data, filters) {
   }
   let query = supabase.from(table).update(data);
   for (const [key, value] of Object.entries(filters)) { query = query.eq(key, value); }
-  return query;
+  const result = await query;
+  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+    console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
+    const rows = memUpdate(table, data, filters);
+    return { data: rows, error: null };
+  }
+  return result;
 }
 
 async function dbUpsert(table, data) {
