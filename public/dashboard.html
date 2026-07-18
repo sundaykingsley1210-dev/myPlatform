@@ -121,7 +121,9 @@
         loadWithdrawInfo();
         loadNotifications();
         setInterval(loadTaskStatus, 60000);
-        setInterval(refreshWallet, 30000);
+        setInterval(refreshWallet, 10000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshWallet(); });
+        window.addEventListener('focus', refreshWallet);
       } catch (err) { window.location.href = '/login.html'; }
     }
 
