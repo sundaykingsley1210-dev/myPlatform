@@ -185,6 +185,22 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
 
     await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: `Your VIP ${tx.vip_level} investment of ₦${tx.amount.toLocaleString()} is now active. Start collecting daily returns!` });
 
+    // Referral bonus: 10% of investment amount
+    try {
+      const investor = await dbQuery('users', 'referred_by', { id: req.userId }, { single: true });
+      if (investor.data && investor.data.referred_by) {
+        const referrer = await dbQuery('users', 'id, username, balance, total_earned', { referral_code: investor.data.referred_by }, { single: true });
+        if (referrer.data) {
+          const bonus = Math.round(tx.amount * 0.10);
+          const newBal = referrer.data.balance + bonus;
+          const newEarned = referrer.data.total_earned + bonus;
+          await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: referrer.data.id });
+          await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${reference}`, bank_name: '', account_number: '', account_name: '' });
+          await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! ${req.username} just invested ₦${tx.amount.toLocaleString()} (VIP ${tx.vip_level}).` });
+        }
+      }
+    } catch (e) { console.log('Referral bonus error:', e.message); }
+
     res.json({ success: true, message: 'Payment verified! Your investment is now active.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
