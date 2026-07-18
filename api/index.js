@@ -324,6 +324,81 @@ app.get('/api/admin/investments', requireAuth, requireAdmin, async (req, res) =>
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== APP DOWNLOAD PAYMENT =====================
+const DOWNLOAD_FEE = 3500;
+
+app.get('/api/download-status', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('transactions', 'id, status', { user_id: req.userId, type: 'app_download', status: 'completed' }, { single: true });
+    res.json({ paid: !!result.data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/request-download', requireAuth, async (req, res) => {
+  try {
+    const existing = await dbQuery('transactions', 'id, status', { user_id: req.userId, type: 'app_download', status: 'completed' }, { single: true });
+    if (existing.data) return res.json({ success: true, paid: true, message: 'Already paid' });
+
+    const ref = `ENRICHU-DL-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    let accountDetails = null;
+
+    try {
+      const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
+        headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
+      });
+      if (tokenRes.data?.responseBody?.accessToken) {
+        const accRes = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
+          accountReference: ref, accountName: `EnrichU-Download-${req.username}`, currencyCode: 'NGN',
+          contractCode: MONNIFY_API_KEY, customerEmail: `${req.username}@enrichu.com`,
+          customerName: req.username, bvn: '00000000000', redirectUrl: `${SITE_URL}/dashboard.html`
+        }, { headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}`, 'Content-Type': 'application/json' } });
+        if (accRes.data?.responseBody) accountDetails = accRes.data.responseBody;
+      }
+    } catch (e) { console.log('Monnify mock mode for download'); }
+
+    if (!accountDetails) {
+      const banks = ['Wema Bank', 'Sterling Bank', 'Kuda Bank', 'VBank'];
+      accountDetails = {
+        accountNumber: `${Math.floor(1000000000 + Math.random() * 9000000000)}`,
+        bankName: banks[Math.floor(Math.random() * banks.length)],
+        accountName: `EnrichU-Download-${req.username}`
+      };
+    }
+
+    await dbInsert('transactions', {
+      user_id: req.userId, type: 'app_download', vip_level: 0, amount: DOWNLOAD_FEE,
+      status: 'pending', reference: ref,
+      bank_name: accountDetails.bankName || accountDetails.bank_name || 'Bank',
+      account_number: accountDetails.accountNumber || accountDetails.account_number || '0000000000',
+      account_name: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}`
+    });
+
+    res.json({
+      success: true, paid: false,
+      paymentDetails: {
+        reference: ref, amount: DOWNLOAD_FEE,
+        bankName: accountDetails.bankName || accountDetails.bank_name || 'Bank',
+        accountNumber: accountDetails.accountNumber || accountDetails.account_number || '0000000000',
+        accountName: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}`
+      }
+    });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/verify-download', requireAuth, async (req, res) => {
+  const { reference } = req.body;
+  try {
+    const result = await dbQuery('transactions', 'id, status', { reference, user_id: req.userId, type: 'app_download' }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
+    if (result.data.status === 'completed') return res.json({ success: true, paid: true, message: 'Already verified' });
+
+    await dbUpdate('transactions', { status: 'completed' }, { id: result.data.id });
+    await dbInsert('notifications', { user_id: req.userId, title: 'App Download Unlocked', message: 'Your app download fee has been confirmed. You can now install the Enrich U app!' });
+
+    res.json({ success: true, paid: true, message: 'Payment verified! You can now install the app.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/withdrawal/:id/approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;

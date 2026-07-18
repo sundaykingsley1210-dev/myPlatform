@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Admin Panel - Enrich U</title>
   <link rel="stylesheet" href="/css/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -255,7 +257,7 @@
       setTimeout(() => t.remove(), 4000);
     }
 
-    function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/'; }
+    function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login.html'; }
 
     async function init() {
       try {
@@ -268,6 +270,10 @@
     }
 
     init();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+    }
   </script>
 </body>
 </html>
