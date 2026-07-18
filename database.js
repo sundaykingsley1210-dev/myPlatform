@@ -1,141 +1,84 @@
-let users = [];
-let investments = [];
-let transactions = [];
-let withdrawals = [];
-let taskClaims = [];
-let nextIds = { users: 1, investments: 1, transactions: 1, withdrawals: 1, task_claims: 1 };
+const { createClient } = require('@supabase/supabase-js');
+
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+let supabase = null;
+let useSupabase = false;
 
 function initDatabase() {
-  console.log('In-memory database initialized');
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    useSupabase = true;
+    console.log('Connected to Supabase cloud database');
+  } else {
+    console.log('WARNING: No Supabase credentials. Using in-memory database.');
+  }
   return Promise.resolve();
 }
 
 function saveDatabase() {}
 
-const db = {
-  run(sql, params = []) {
-    const s = sql.trim().toUpperCase();
-    if (s.startsWith('INSERT INTO USERS')) {
-      const id = nextIds.users++;
-      const now = new Date().toISOString();
-      users.push({ id, username: params[0], password: params[1], full_name: '', phone: '', email: '', balance: 0, total_earned: 0, created_at: now });
-      return;
-    }
-    if (s.startsWith('INSERT INTO INVESTMENTS')) {
-      const id = nextIds.investments++;
-      const now = new Date().toISOString();
-      investments.push({ id, user_id: params[0], vip_level: params[1], amount: params[2], daily_return: params[3], status: 'active', total_collected: 0, days_collected: 0, created_at: now });
-      return;
-    }
-    if (s.startsWith('INSERT INTO TRANSACTIONS')) {
-      const id = nextIds.transactions++;
-      const now = new Date().toISOString();
-      transactions.push({ id, user_id: params[0], type: params[1], amount: params[2], status: params[3], reference: params[4], bank_name: params[5], account_number: params[6], account_name: params[7], created_at: now });
-      return;
-    }
-    if (s.startsWith('INSERT INTO WITHDRAWALS')) {
-      const id = nextIds.withdrawals++;
-      const now = new Date().toISOString();
-      withdrawals.push({ id, user_id: params[0], amount: params[1], bank_name: params[2], account_number: params[3], account_name: params[4], status: params[5], created_at: now });
-      return;
-    }
-    if (s.startsWith('INSERT INTO TASK_CLAIMS')) {
-      const id = nextIds.task_claims++;
-      const now = new Date().toISOString();
-      taskClaims.push({ id, user_id: params[0], investment_id: params[1], claim_date: params[2], amount: params[3], created_at: now });
-      return;
-    }
-    if (s.startsWith('UPDATE USERS SET BALANCE = BALANCE +') && s.includes('TOTAL_EARNED')) {
-      const u = users.find(u => u.id === params[2]);
-      if (u) { u.balance += params[0]; u.total_earned += params[1]; }
-      return;
-    }
-    if (s.startsWith('UPDATE USERS SET BALANCE = BALANCE +')) {
-      const u = users.find(u => u.id === params[1]);
-      if (u) u.balance += params[0];
-      return;
-    }
-    if (s.startsWith('UPDATE USERS SET BALANCE = BALANCE -')) {
-      const u = users.find(u => u.id === params[1]);
-      if (u) u.balance -= params[0];
-      return;
-    }
-    if (s.startsWith('UPDATE INVESTMENTS SET TOTAL_COLLECTED')) {
-      const inv = investments.find(i => i.id === params[1]);
-      if (inv) { inv.total_collected += params[0]; inv.days_collected += 1; }
-      return;
-    }
-    if (s.startsWith('UPDATE TRANSACTIONS SET STATUS')) {
-      const tx = transactions.find(t => t.id === params[0]);
-      if (tx) tx.status = 'completed';
-      return;
-    }
-  },
+async function dbQuery(table, columns = '*', filters = {}, options = {}) {
+  if (!useSupabase) return { data: null, error: { message: 'No database connected' } };
 
-  exec(sql, params = []) {
-    const s = sql.trim().toUpperCase();
-    const col = (row, name) => row ? row[name] : undefined;
+  let query = supabase.from(table).select(columns);
 
-    if (s.includes('FROM USERS WHERE USERNAME = ?') && !s.includes('BALANCE')) {
-      const user = users.find(u => u.username === params[0]);
-      if (!user) return [];
-      return [{ values: [[user.id, user.username, user.password, user.balance, user.total_earned]] }];
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === null) {
+      query = query.is(key, null);
+    } else if (typeof value === 'object' && value.op) {
+      switch (value.op) {
+        case 'eq': query = query.eq(key, value.val); break;
+        case 'neq': query = query.neq(key, value.val); break;
+        case 'gt': query = query.gt(key, value.val); break;
+        case 'lt': query = query.lt(key, value.val); break;
+        case 'gte': query = query.gte(key, value.val); break;
+        case 'lte': query = query.lte(key, value.val); break;
+        case 'in': query = query.in(key, value.val); break;
+        case 'like': query = query.like(key, value.val); break;
+        case 'ilike': query = query.ilike(key, value.val); break;
+      }
+    } else {
+      query = query.eq(key, value);
     }
-    if (s.includes('FROM USERS WHERE ID = ?') && s.includes('BALANCE')) {
-      const user = users.find(u => u.id === params[0]);
-      if (!user) return [];
-      return [{ values: [[user.balance]] }];
-    }
-    if (s.includes('FROM USERS WHERE ID = ?') && s.includes('USERNAME')) {
-      const user = users.find(u => u.id === params[0]);
-      if (!user) return [];
-      return [{ values: [[user.id, user.username, user.balance, user.total_earned]] }];
-    }
-    if (s.includes('SELECT ID FROM USERS WHERE USERNAME')) {
-      const user = users.find(u => u.username === params[0]);
-      if (!user) return [];
-      return [{ values: [[user.id]] }];
-    }
-    if (s.includes('FROM INVESTMENTS WHERE USER_ID = ? AND VIP_LEVEL = ? AND STATUS')) {
-      const inv = investments.find(i => i.user_id === params[0] && i.vip_level === params[1] && i.status === 'active');
-      if (!inv) return [];
-      return [{ values: [[inv.id]] }];
-    }
-    if (s.includes('FROM INVESTMENTS WHERE ID = ? AND USER_ID = ?')) {
-      const inv = investments.find(i => i.id === params[0] && i.user_id === params[1]);
-      if (!inv) return [];
-      return [{ values: [[inv.id, inv.vip_level, inv.daily_return, inv.status, inv.total_collected, inv.days_collected]] }];
-    }
-    if (s.includes('FROM INVESTMENTS WHERE USER_ID = ?') && s.includes('ORDER BY')) {
-      const invs = investments.filter(i => i.user_id === params[0]).sort((a, b) => b.id - a.id);
-      if (invs.length === 0) return [];
-      return [{ values: invs.map(i => [i.id, i.vip_level, i.amount, i.daily_return, i.status, i.total_collected, i.days_collected, i.created_at]) }];
-    }
-    if (s.includes('SELECT DISTINCT VIP_LEVEL FROM INVESTMENTS')) {
-      const invs = investments.filter(i => i.user_id === params[0] && i.status === 'active');
-      const levels = [...new Set(invs.map(i => i.vip_level))];
-      if (levels.length === 0) return [];
-      return [{ values: levels.map(l => [l]) }];
-    }
-    if (s.includes('FROM TRANSACTIONS WHERE REFERENCE = ?')) {
-      const tx = transactions.find(t => t.reference === params[0] && t.user_id === params[1]);
-      if (!tx) return [];
-      return [{ values: [[tx.id, tx.vip_level, tx.amount, tx.status]] }];
-    }
-    if (s.includes('FROM TASK_CLAIMS WHERE USER_ID = ? AND INVESTMENT_ID = ? AND CLAIM_DATE')) {
-      const tc = taskClaims.find(t => t.user_id === params[0] && t.investment_id === params[1] && t.claim_date === params[2]);
-      if (!tc) return [];
-      return [{ values: [[tc.id]] }];
-    }
-    if (s.includes('FROM WITHDRAWALS WHERE USER_ID = ?')) {
-      const wds = withdrawals.filter(w => w.user_id === params[0]).sort((a, b) => b.id - a.id);
-      if (wds.length === 0) return [];
-      return [{ values: wds.map(w => [w.id, w.amount, w.bank_name, w.account_number, w.account_name, w.status, w.created_at]) }];
-    }
-    return [];
   }
-};
 
-function getDb() { return db; }
+  if (options.order) {
+    query = query.order(options.order.column, { ascending: options.order.ascending ?? false });
+  }
+  if (options.limit) query = query.limit(options.limit);
+  if (options.single) query = query.single();
 
-module.exports = { initDatabase, saveDatabase, getDb };
+  return query;
+}
+
+async function dbInsert(table, data) {
+  if (!useSupabase) return { data: null, error: { message: 'No database connected' } };
+  return supabase.from(table).insert(data).select();
+}
+
+async function dbUpdate(table, data, filters) {
+  if (!useSupabase) return { data: null, error: { message: 'No database connected' } };
+  let query = supabase.from(table).update(data);
+  for (const [key, value] of Object.entries(filters)) {
+    query = query.eq(key, value);
+  }
+  return query;
+}
+
+async function dbUpsert(table, data) {
+  if (!useSupabase) return { data: null, error: { message: 'No database connected' } };
+  return supabase.from(table).upsert(data).select();
+}
+
+async function dbDelete(table, filters) {
+  if (!useSupabase) return { data: null, error: { message: 'No database connected' } };
+  let query = supabase.from(table).delete();
+  for (const [key, value] of Object.entries(filters)) {
+    query = query.eq(key, value);
+  }
+  return query;
+}
+
+module.exports = { initDatabase, saveDatabase, dbQuery, dbInsert, dbUpdate, dbUpsert, dbDelete, supabase: () => supabase, isSupabase: () => useSupabase };

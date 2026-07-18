@@ -1,15 +1,16 @@
 const express = require('express');
-const session = require('express-session');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const path = require('path');
-const { initDatabase, saveDatabase, getDb } = require('../database');
+const { initDatabase, dbQuery, dbInsert, dbUpdate, isSupabase } = require('../database');
 
 const app = express();
-
+const JWT_SECRET = process.env.JWT_SECRET || 'enrich-u-jwt-secret-2026';
 const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || 'MK_TEST_AT2CBMNZX6';
 const MONNIFY_SECRET = process.env.MONNIFY_SECRET || '9VCCTEUUY5J63TJUGP8DN7ENLAP13WYC';
 const MONNIFY_BASE_URL = 'https://api.monnify.com';
+const SITE_URL = process.env.SITE_URL || 'https://myplatform-seven.vercel.app';
 
 const VIP_PLANS = {
   1: { amount: 9000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
@@ -25,248 +26,340 @@ const VIP_PLANS = {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
-app.use(session({
-  secret: 'enrich-u-secret-key-2026',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
-}));
+
+function generateToken(user) {
+  return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
+}
 
 function requireAuth(req, res, next) {
-  if (!req.session.userId) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Please login to continue' });
   }
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.id;
+    req.username = decoded.username;
+    req.isAdmin = decoded.is_admin;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Session expired. Please login again.' });
+  }
+}
+
+function requireAdmin(req, res, next) {
+  if (!req.isAdmin) return res.status(403).json({ error: 'Admin access required' });
   next();
 }
 
-// AUTH ROUTES
-app.post('/api/register', (req, res) => {
+// ===================== AUTH ROUTES =====================
+app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
-  const db = getDb();
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
   if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
   if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
-  const existing = db.exec("SELECT id FROM users WHERE username = ?", [username]);
-  if (existing.length > 0 && existing[0].values.length > 0) {
-    return res.status(400).json({ error: 'Account already exists! Please login instead.' });
-  }
-
-  const hashedPassword = bcrypt.hashSync(password, 10);
   try {
-    db.run("INSERT INTO users (username, password) VALUES (?, ?)", [username, hashedPassword]);
-    saveDatabase();
-    const result = db.exec("SELECT id FROM users WHERE username = ?", [username]);
-    const userId = result[0].values[0][0];
-    req.session.userId = userId;
-    req.session.username = username;
-    res.json({ success: true, message: 'Account created successfully!', userId, username });
+    const existing = await dbQuery('users', 'id', { username });
+    if (existing.data && existing.data.length > 0) {
+      return res.status(400).json({ error: 'Account already exists! Please login instead.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await dbInsert('users', { username, password: hashedPassword });
+
+    if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });
+
+    const user = result.data[0];
+    const token = generateToken(user);
+
+    await dbInsert('notifications', { user_id: user.id, title: 'Welcome to Enrich U!', message: 'Your account has been created successfully. Start investing to earn daily returns!' });
+
+    res.json({ success: true, message: 'Account created successfully!', token, user: { id: user.id, username: user.username, balance: 0, totalEarned: 0 } });
   } catch (err) {
     res.status(500).json({ error: 'Registration failed: ' + err.message });
   }
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const db = getDb();
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
-  const result = db.exec("SELECT id, username, password, balance, total_earned FROM users WHERE username = ?", [username]);
-  if (result.length === 0 || result[0].values.length === 0) {
-    return res.status(400).json({ error: 'Invalid username or password' });
+  try {
+    const result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin', { username }, { single: true });
+    if (!result.data) return res.status(400).json({ error: 'Invalid username or password' });
+
+    const user = result.data;
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(400).json({ error: 'Invalid username or password' });
+
+    const token = generateToken(user);
+    res.json({ success: true, message: 'Login successful!', token, user: { id: user.id, username: user.username, balance: user.balance, totalEarned: user.total_earned, isAdmin: user.is_admin } });
+  } catch (err) {
+    res.status(500).json({ error: 'Login failed: ' + err.message });
   }
-  const [id, uname, hashedPassword, balance, totalEarned] = result[0].values[0];
-  if (!bcrypt.compareSync(password, hashedPassword)) {
-    return res.status(400).json({ error: 'Invalid username or password' });
-  }
-  req.session.userId = id;
-  req.session.username = uname;
-  res.json({ success: true, message: 'Login successful!', user: { id, username: uname, balance, totalEarned } });
 });
 
-app.post('/api/logout', (req, res) => { req.session.destroy(); res.json({ success: true, message: 'Logged out' }); });
-
-app.get('/api/me', requireAuth, (req, res) => {
-  const db = getDb();
-  const result = db.exec("SELECT id, username, balance, total_earned FROM users WHERE id = ?", [req.session.userId]);
-  if (result.length === 0 || result[0].values.length === 0) return res.status(404).json({ error: 'User not found' });
-  const [id, username, balance, totalEarned] = result[0].values[0];
-  res.json({ user: { id, username, balance, totalEarned } });
+app.get('/api/me', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin', { id: req.userId }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'User not found' });
+    const u = result.data;
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get('/api/vip-plans', (req, res) => { res.json({ plans: VIP_PLANS }); });
+// ===================== VIP PLANS =====================
+app.get('/api/vip-plans', (req, res) => res.json({ plans: VIP_PLANS }));
 
+// ===================== INVESTMENT / PAYMENT =====================
 app.post('/api/create-investment', requireAuth, async (req, res) => {
   const { vipLevel } = req.body;
-  const db = getDb();
   const plan = VIP_PLANS[vipLevel];
   if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
 
-  const existingActive = db.exec("SELECT id FROM investments WHERE user_id = ? AND vip_level = ? AND status = 'active'", [req.session.userId, vipLevel]);
-  if (existingActive.length > 0 && existingActive[0].values.length > 0) {
-    return res.status(400).json({ error: 'You already have an active investment in this VIP plan' });
-  }
-
-  const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-
   try {
+    const existing = await dbQuery('investments', 'id', { user_id: req.userId, vip_level: parseInt(vipLevel), status: 'active' });
+    if (existing.data && existing.data.length > 0) return res.status(400).json({ error: 'You already have an active investment in this VIP plan' });
+
+    const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
+
     try {
-      const tokenResponse = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
+      const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
         headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
       });
-      if (tokenResponse.data && tokenResponse.data.responseBody && tokenResponse.data.responseBody.accessToken) {
-        const accessToken = tokenResponse.data.responseBody.accessToken;
-        const reservedAccount = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
-          accountReference: ref, accountName: `EnrichU-${req.session.username}`, currencyCode: 'NGN',
-          contractCode: MONNIFY_API_KEY, customerEmail: `${req.session.username}@enrichu.com`,
-          customerName: req.session.username, bvn: '00000000000',
-          redirectUrl: `https://vercel.app/dashboard`
-        }, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
-        if (reservedAccount.data && reservedAccount.data.responseBody) accountDetails = reservedAccount.data.responseBody;
+      if (tokenRes.data?.responseBody?.accessToken) {
+        const accRes = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
+          accountReference: ref, accountName: `EnrichU-${req.username}`, currencyCode: 'NGN',
+          contractCode: MONNIFY_API_KEY, customerEmail: `${req.username}@enrichu.com`,
+          customerName: req.username, bvn: '00000000000', redirectUrl: `${SITE_URL}/dashboard.html`
+        }, { headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}`, 'Content-Type': 'application/json' } });
+        if (accRes.data?.responseBody) accountDetails = accRes.data.responseBody;
       }
-    } catch (e) { console.log('Monnify not configured, using mock'); }
+    } catch (e) { console.log('Monnify mock mode'); }
 
     if (!accountDetails) {
-      const bankNames = ['Wema Bank', 'Sterling Bank', 'Kuda Bank', 'VBank'];
+      const banks = ['Wema Bank', 'Sterling Bank', 'Kuda Bank', 'VBank'];
       accountDetails = {
         accountNumber: `${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-        bankName: bankNames[Math.floor(Math.random() * bankNames.length)],
-        accountName: `EnrichU-${req.session.username}`
+        bankName: banks[Math.floor(Math.random() * banks.length)],
+        accountName: `EnrichU-${req.username}`
       };
     }
 
-    db.run("INSERT INTO transactions (user_id, type, amount, status, reference, bank_name, account_number, account_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [req.session.userId, 'investment', plan.amount, 'pending', ref, accountDetails.bankName, accountDetails.accountNumber, accountDetails.accountName]);
-    saveDatabase();
+    await dbInsert('transactions', { user_id: req.userId, type: 'investment', amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || accountDetails.bank_name || 'Bank', account_number: accountDetails.accountNumber || accountDetails.account_number || '0000000000', account_name: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}` });
 
-    res.json({ success: true, message: 'Payment details generated.', paymentDetails: {
-      reference: ref, amount: plan.amount, bankName: accountDetails.bankName,
-      accountNumber: accountDetails.accountNumber, accountName: accountDetails.accountName, vipLevel
-    }});
+    res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, bankName: accountDetails.bankName || accountDetails.bank_name || 'Bank', accountNumber: accountDetails.accountNumber || accountDetails.account_number || '0000000000', accountName: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}`, vipLevel } });
   } catch (err) { res.status(500).json({ error: 'Failed: ' + err.message }); }
 });
 
-app.post('/api/verify-payment', requireAuth, (req, res) => {
+app.post('/api/verify-payment', requireAuth, async (req, res) => {
   const { reference } = req.body;
-  const db = getDb();
-  const result = db.exec("SELECT id, vip_level, amount, status FROM transactions WHERE reference = ? AND user_id = ?", [reference, req.session.userId]);
-  if (result.length === 0 || result[0].values.length === 0) return res.status(404).json({ error: 'Transaction not found' });
-  const [txId, vipLevel, amount, status] = result[0].values[0];
-  if (status === 'completed') return res.json({ success: true, message: 'Payment already verified' });
-  const plan = VIP_PLANS[vipLevel];
-  db.run("UPDATE transactions SET status = 'completed' WHERE id = ?", [txId]);
-  db.run("INSERT INTO investments (user_id, vip_level, amount, daily_return, status) VALUES (?, ?, ?, ?, 'active')", [req.session.userId, vipLevel, amount, plan.dailyReturn]);
-  saveDatabase();
-  res.json({ success: true, message: 'Payment verified! Your investment is now active.' });
+  try {
+    const result = await dbQuery('transactions', 'id, vip_level, amount, status', { reference, user_id: req.userId }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
+
+    const tx = result.data;
+    if (tx.status === 'completed') return res.json({ success: true, message: 'Payment already verified' });
+
+    const plan = VIP_PLANS[tx.vip_level];
+    await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
+    await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active' });
+
+    await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: `Your VIP ${tx.vip_level} investment of ₦${tx.amount.toLocaleString()} is now active. Start collecting daily returns!` });
+
+    res.json({ success: true, message: 'Payment verified! Your investment is now active.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/my-investments', requireAuth, (req, res) => {
-  const db = getDb();
-  const result = db.exec("SELECT id, vip_level, amount, daily_return, status, total_collected, days_collected, created_at FROM investments WHERE user_id = ? ORDER BY created_at DESC", [req.session.userId]);
-  const investments = [];
-  if (result.length > 0) investments.push(...result[0].values.map(row => ({
-    id: row[0], vipLevel: row[1], amount: row[2], dailyReturn: row[3], status: row[4], totalCollected: row[5], daysCollected: row[6], createdAt: row[7]
-  })));
-  res.json({ investments });
+app.get('/api/my-investments', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('investments', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
+    const investments = (result.data || []).map(i => ({ id: i.id, vipLevel: i.vip_level, amount: i.amount, dailyReturn: i.daily_return, status: i.status, totalCollected: i.total_collected, daysCollected: i.days_collected, createdAt: i.created_at }));
+    res.json({ investments });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== TASKS =====================
 app.get('/api/task-status', requireAuth, (req, res) => {
   const now = new Date();
-  const nigeriaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-  const day = nigeriaTime.getDay();
-  const hours = nigeriaTime.getHours();
-  const minutes = nigeriaTime.getMinutes();
-  const currentTime = hours * 60 + minutes;
-  const isWeekday = day >= 1 && day <= 5;
-  const isTaskTime = currentTime >= 600 && currentTime < 1020;
-  res.json({ isWeekday, isTaskTime, canClaim: isWeekday && isTaskTime,
-    nigeriaTime: nigeriaTime.toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }),
-    message: !isWeekday ? 'Tasks are only available Monday to Friday.' : !isTaskTime ? 'Tasks are available between 10:00 AM and 6:00 PM. No task yet.' : 'Tasks are active! You can collect your daily returns.'
-  });
+  const ng = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+  const day = ng.getDay(), h = ng.getHours(), m = ng.getMinutes(), t = h * 60 + m;
+  const isWeekday = day >= 1 && day <= 5, isTaskTime = t >= 600 && t < 1020;
+  res.json({ canClaim: isWeekday && isTaskTime, nigeriaTime: ng.toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }), message: !isWeekday ? 'Tasks are only available Monday to Friday.' : !isTaskTime ? 'Tasks are available between 10:00 AM and 6:00 PM. No task yet.' : 'Tasks are active! Collect your daily returns.' });
 });
 
-app.post('/api/claim-task', requireAuth, (req, res) => {
+app.post('/api/claim-task', requireAuth, async (req, res) => {
   const { investmentId } = req.body;
-  const db = getDb();
   const now = new Date();
-  const nigeriaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-  const day = nigeriaTime.getDay();
-  const hours = nigeriaTime.getHours();
-  const minutes = nigeriaTime.getMinutes();
-  const currentTime = hours * 60 + minutes;
-  const isWeekday = day >= 1 && day <= 5;
-  const isTaskTime = currentTime >= 600 && currentTime < 1020;
-  if (!isWeekday || !isTaskTime) return res.status(400).json({ error: 'Tasks are only available Monday to Friday, between 10:00 AM and 6:00 PM.' });
+  const ng = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+  const day = ng.getDay(), h = ng.getHours(), m = ng.getMinutes(), t = h * 60 + m;
+  if (!(day >= 1 && day <= 5) || !(t >= 600 && t < 1020)) return res.status(400).json({ error: 'Tasks are only available Monday to Friday, 10:00 AM - 6:00 PM.' });
 
-  const result = db.exec("SELECT id, vip_level, daily_return, status, total_collected, days_collected FROM investments WHERE id = ? AND user_id = ?", [investmentId, req.session.userId]);
-  if (result.length === 0 || result[0].values.length === 0) return res.status(404).json({ error: 'Investment not found' });
-  const [id, vipLevel, dailyReturn, status, totalCollected, daysCollected] = result[0].values[0];
-  if (status !== 'active') return res.status(400).json({ error: 'This investment is not active' });
+  try {
+    const invResult = await dbQuery('investments', 'id, vip_level, daily_return, status, total_collected, days_collected', { id: investmentId, user_id: req.userId }, { single: true });
+    if (!invResult.data) return res.status(404).json({ error: 'Investment not found' });
 
-  const today = nigeriaTime.toISOString().split('T')[0];
-  const existingClaim = db.exec("SELECT id FROM task_claims WHERE user_id = ? AND investment_id = ? AND claim_date = ?", [req.session.userId, investmentId, today]);
-  if (existingClaim.length > 0 && existingClaim[0].values.length > 0) {
-    return res.status(400).json({ error: "You have already collected today's return. Come back tomorrow!" });
-  }
+    const inv = invResult.data;
+    if (inv.status !== 'active') return res.status(400).json({ error: 'This investment is not active' });
 
-  db.run("INSERT INTO task_claims (user_id, investment_id, claim_date, amount) VALUES (?, ?, ?, ?)", [req.session.userId, investmentId, today, dailyReturn]);
-  db.run("UPDATE investments SET total_collected = total_collected + ?, days_collected = days_collected + 1 WHERE id = ?", [dailyReturn, investmentId]);
-  db.run("UPDATE users SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?", [dailyReturn, dailyReturn, req.session.userId]);
-  saveDatabase();
+    const today = ng.toISOString().split('T')[0];
+    const existingClaim = await dbQuery('task_claims', 'id', { user_id: req.userId, investment_id: investmentId, claim_date: today });
+    if (existingClaim.data && existingClaim.data.length > 0) return res.status(400).json({ error: "Already collected today's return. Come back tomorrow!" });
 
-  const newBalance = db.exec("SELECT balance FROM users WHERE id = ?", [req.session.userId]);
-  res.json({ success: true, message: `Successfully collected ₦${dailyReturn.toLocaleString()}!`, amount: dailyReturn, newBalance: newBalance[0].values[0][0], totalCollected: totalCollected + dailyReturn, daysCollected: daysCollected + 1 });
+    await dbInsert('task_claims', { user_id: req.userId, investment_id: investmentId, claim_date: today, amount: inv.daily_return });
+    await dbUpdate('investments', { total_collected: inv.total_collected + inv.daily_return, days_collected: inv.days_collected + 1 }, { id: investmentId });
+
+    const userRes = await dbQuery('users', 'balance, total_earned', { id: req.userId }, { single: true });
+    const newBal = userRes.data.balance + inv.daily_return;
+    const newEarned = userRes.data.total_earned + inv.daily_return;
+    await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: req.userId });
+
+    await dbInsert('notifications', { user_id: req.userId, title: 'Daily Return Collected', message: `₦${inv.daily_return.toLocaleString()} has been added to your wallet from VIP ${inv.vip_level}.` });
+
+    res.json({ success: true, message: `Collected ₦${inv.daily_return.toLocaleString()}!`, amount: inv.daily_return, newBalance: newBal, totalCollected: inv.total_collected + inv.daily_return, daysCollected: inv.days_collected + 1 });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/withdraw', requireAuth, (req, res) => {
+// ===================== WITHDRAWALS =====================
+app.post('/api/withdraw', requireAuth, async (req, res) => {
   const { amount, bankName, accountNumber, accountName } = req.body;
-  const db = getDb();
-  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid withdrawal amount' });
-  if (!bankName || !accountNumber || !accountName) return res.status(400).json({ error: 'Bank details are required' });
+  if (!amount || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
+  if (!bankName || !accountNumber || !accountName) return res.status(400).json({ error: 'Bank details required' });
 
-  const userResult = db.exec("SELECT balance FROM users WHERE id = ?", [req.session.userId]);
-  const balance = userResult[0].values[0][0];
-  if (balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
+  try {
+    const userRes = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+    if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
 
-  const now = new Date();
-  const nigeriaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const currentDayName = dayNames[nigeriaTime.getDay()];
+    const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = dayNames[ng.getDay()];
 
-  const investments = db.exec("SELECT DISTINCT vip_level FROM investments WHERE user_id = ? AND status = 'active'", [req.session.userId]);
-  if (investments.length === 0 || investments[0].values.length === 0) return res.status(400).json({ error: 'You have no active investments' });
+    const invRes = await dbQuery('investments', 'vip_level', { user_id: req.userId, status: 'active' });
+    if (!invRes.data || invRes.data.length === 0) return res.status(400).json({ error: 'No active investments' });
 
-  const vipLevels = investments[0].values.map(row => row[0]);
-  const allowedDays = new Set();
-  vipLevels.forEach(level => allowedDays.add(VIP_PLANS[level].withdrawalDay));
-  if (!allowedDays.has(currentDayName)) {
-    return res.status(400).json({ error: `Withdrawal not available today (${currentDayName}). Your days: ${[...allowedDays].join(', ')}` });
-  }
+    const allowedDays = new Set(invRes.data.map(i => VIP_PLANS[i.vip_level]?.withdrawalDay));
+    if (!allowedDays.has(currentDay)) return res.status(400).json({ error: `Not available today (${currentDay}). Your days: ${[...allowedDays].join(', ')}` });
 
-  db.run("UPDATE users SET balance = balance - ? WHERE id = ?", [amount, req.session.userId]);
-  db.run("INSERT INTO withdrawals (user_id, amount, bank_name, account_number, account_name, status) VALUES (?, ?, ?, ?, ?, 'pending')", [req.session.userId, amount, bankName, accountNumber, accountName]);
-  saveDatabase();
+    await dbUpdate('users', { balance: userRes.data.balance - amount }, { id: req.userId });
+    await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending' });
 
-  const newBalance = db.exec("SELECT balance FROM users WHERE id = ?", [req.session.userId]);
-  res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted.`, newBalance: newBalance[0].values[0][0] });
+    await dbInsert('notifications', { user_id: req.userId, title: 'Withdrawal Submitted', message: `Your withdrawal of ₦${amount.toLocaleString()} has been submitted and is being processed.` });
+
+    const newBal = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+    res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted.`, newBalance: newBal.data.balance });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/my-withdrawals', requireAuth, (req, res) => {
-  const db = getDb();
-  const result = db.exec("SELECT id, amount, bank_name, account_number, account_name, status, created_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC", [req.session.userId]);
-  const withdrawals = [];
-  if (result.length > 0) withdrawals.push(...result[0].values.map(row => ({
-    id: row[0], amount: row[1], bankName: row[2], accountNumber: row[3], accountName: row[4], status: row[5], createdAt: row[6]
-  })));
-  res.json({ withdrawals });
+app.get('/api/my-withdrawals', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('withdrawals', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
+    const withdrawals = (result.data || []).map(w => ({ id: w.id, amount: w.amount, bankName: w.bank_name, accountNumber: w.account_number, accountName: w.account_name, status: w.status, adminNote: w.admin_note, createdAt: w.created_at }));
+    res.json({ withdrawals });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== NOTIFICATIONS =====================
+app.get('/api/notifications', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('notifications', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false }, limit: 20 });
+    res.json({ notifications: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/notifications/read', requireAuth, async (req, res) => {
+  try {
+    await dbUpdate('notifications', { is_read: true }, { user_id: req.userId });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== ADMIN ROUTES =====================
+app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('users', 'id, username, email, balance, total_earned, is_admin, created_at', {}, { order: { column: 'created_at', ascending: false } });
+    res.json({ users: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/withdrawals', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('withdrawals', '*', {}, { order: { column: 'created_at', ascending: false } });
+    res.json({ withdrawals: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const users = await dbQuery('users', 'id', {});
+    const investments = await dbQuery('investments', 'id, amount', { status: 'active' });
+    const withdrawals = await dbQuery('withdrawals', 'id, amount', { status: 'pending' });
+    const totalInvested = await dbQuery('investments', 'amount', {});
+
+    const totalUsers = users.data?.length || 0;
+    const activeInvestments = investments.data?.length || 0;
+    const pendingWithdrawals = withdrawals.data?.length || 0;
+    const totalInvestedAmount = totalInvested.data?.reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
+    const pendingWithdrawalAmount = withdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+
+    res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals, totalInvestedAmount, pendingWithdrawalAmount } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/withdrawal/:id/approve', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('withdrawals', 'user_id, amount', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
+
+    await dbUpdate('withdrawals', { status: 'completed', admin_note: req.body.note || 'Approved by admin' }, { id: parseInt(id) });
+    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Approved', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been approved and processed.` });
+
+    res.json({ success: true, message: 'Withdrawal approved' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
+
+    await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin' }, { id: parseInt(id) });
+    await dbUpdate('users', { balance: { op: 'increment', val: result.data.amount } }, { id: result.data.user_id });
+
+    const userRes = await dbQuery('users', 'balance', { id: result.data.user_id }, { single: true });
+    const refund = userRes.data.balance + result.data.amount;
+    await dbUpdate('users', { balance: refund }, { id: result.data.user_id });
+
+    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Rejected', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been rejected. Amount has been refunded to your wallet. Reason: ${req.body.note || 'No reason provided'}` });
+
+    res.json({ success: true, message: 'Withdrawal rejected and refunded' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await dbQuery('users', 'is_admin', { id: parseInt(id) }, { single: true });
+    if (!user.data) return res.status(404).json({ error: 'User not found' });
+    await dbUpdate('users', { is_admin: !user.data.is_admin }, { id: parseInt(id) });
+    res.json({ success: true, message: 'Admin status toggled' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== HTML ROUTES =====================
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'register.html')));
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'login.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 
+// ===================== INIT =====================
 let dbInitialized = false;
 module.exports = async (req, res) => {
   if (!dbInitialized) {

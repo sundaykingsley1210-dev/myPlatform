@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#0a0e27">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Admin Panel - Enrich U</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-container">
+      <a href="/" class="logo"><i class="fas fa-gem"></i> Enrich <span>U</span></a>
+      <div class="nav-actions">
+        <a href="/dashboard.html" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Dashboard</a>
+        <a href="#" class="btn btn-outline" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="dashboard-page">
+    <div class="container">
+      <div class="dashboard-header">
+        <h1><i class="fas fa-shield-halved" style="color:var(--primary);"></i> Admin Panel</h1>
+        <p>Manage users, withdrawals, and platform settings</p>
+      </div>
+
+      <div class="dash-stats">
+        <div class="dash-stat-card"><div class="label">Total Users</div><div class="value primary" id="totalUsers">0</div></div>
+        <div class="dash-stat-card"><div class="label">Total Invested</div><div class="value accent" id="totalInvested">₦0</div></div>
+        <div class="dash-stat-card"><div class="label">Pending Withdrawals</div><div class="value gold" id="pendingWithdrawals">0</div></div>
+      </div>
+
+      <div class="dash-tabs">
+        <button class="dash-tab active" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals</button>
+        <button class="dash-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
+      </div>
+
+      <div class="dash-panel active" id="panel-withdrawals"><div id="withdrawalsList"></div></div>
+      <div class="dash-panel" id="panel-users"><div id="usersList"></div></div>
+    </div>
+  </div>
+
+  <div id="toastContainer"></div>
+
+  <script>
+    const API = (url, opts = {}) => {
+      const token = localStorage.getItem('token');
+      const headers = { ...(opts.headers || {}), 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, { ...opts, headers }).then(async r => {
+        if (r.status === 401 || r.status === 403) { window.location.href = '/login.html'; return r; }
+        return r;
+      });
+    };
+
+    function switchTab(tab, el) {
+      document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      document.getElementById('panel-' + tab).classList.add('active');
+      if (tab === 'users') loadUsers();
+      if (tab === 'withdrawals') loadWithdrawals();
+    }
+
+    async function loadStats() {
+      try {
+        const res = await API('/api/admin/stats');
+        const data = await res.json();
+        const s = data.stats;
+        document.getElementById('totalUsers').textContent = s.totalUsers;
+        document.getElementById('totalInvested').textContent = '₦' + s.totalInvestedAmount.toLocaleString();
+        document.getElementById('pendingWithdrawals').textContent = s.pendingWithdrawals;
+      } catch (err) {}
+    }
+
+    async function loadWithdrawals() {
+      try {
+        const res = await API('/api/admin/withdrawals');
+        const data = await res.json();
+        const list = document.getElementById('withdrawalsList');
+        if (!data.withdrawals || !data.withdrawals.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-money-bill-wave"></i><h3>No Withdrawals</h3></div>'; return; }
+        let html = '';
+        data.withdrawals.forEach(w => {
+          const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
+          html += `<div class="investment-card">
+            <div class="investment-header">
+              <div class="investment-vip"><span style="font-size:1.1rem;font-weight:700;color:var(--primary);">₦${Number(w.amount).toLocaleString()}</span>
+              <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div>
+              <span style="font-size:0.8rem;color:var(--text-muted);">User ID: ${w.user_id}</span>
+            </div>
+            <div class="investment-details">
+              <div class="invest-detail"><div class="label">Bank</div><div class="val">${w.bank_name}</div></div>
+              <div class="invest-detail"><div class="label">Account</div><div class="val">${w.account_number}</div></div>
+              <div class="invest-detail"><div class="label">Name</div><div class="val">${w.account_name}</div></div>
+              <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(w.created_at).toLocaleDateString()}</div></div>
+            </div>
+            ${w.admin_note ? '<div style="padding:8px 12px;background:rgba(255,215,0,0.05);border-radius:6px;font-size:0.8rem;color:var(--gold);margin-top:12px;"><i class="fas fa-comment"></i> ' + w.admin_note + '</div>' : ''}
+            ${w.status === 'pending' ? `<div class="claim-btn-container" style="display:flex;gap:8px;justify-content:center;margin-top:16px;">
+              <button class="btn btn-accent" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Approve</button>
+              <button class="btn btn-danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Reject</button>
+            </div>` : ''}
+          </div>`;
+        });
+        list.innerHTML = html;
+      } catch (err) {}
+    }
+
+    async function approveWithdrawal(id) {
+      const note = prompt('Admin note (optional):') || 'Approved';
+      try {
+        const res = await API('/api/admin/withdrawal/' + id + '/approve', { method: 'POST', body: JSON.stringify({ note }) });
+        const data = await res.json();
+        if (res.ok) { showToast('Withdrawal approved', 'success'); loadWithdrawals(); loadStats(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+    }
+
+    async function rejectWithdrawal(id) {
+      const note = prompt('Rejection reason:');
+      if (!note) return;
+      try {
+        const res = await API('/api/admin/withdrawal/' + id + '/reject', { method: 'POST', body: JSON.stringify({ note }) });
+        const data = await res.json();
+        if (res.ok) { showToast('Withdrawal rejected & refunded', 'success'); loadWithdrawals(); loadStats(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+    }
+
+    async function loadUsers() {
+      try {
+        const res = await API('/api/admin/users');
+        const data = await res.json();
+        const list = document.getElementById('usersList');
+        if (!data.users || !data.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>No Users</h3></div>'; return; }
+        let html = '';
+        data.users.forEach(u => {
+          html += `<div class="investment-card">
+            <div class="investment-header">
+              <div class="investment-vip"><span style="font-weight:700;">${u.username}</span>
+              ${u.is_admin ? '<span class="status-badge" style="background:rgba(0,87,255,0.1);color:var(--primary);border:1px solid rgba(0,87,255,0.2);">ADMIN</span>' : ''}</div>
+              <span style="font-size:0.8rem;color:var(--text-muted);">ID: ${u.id}</span>
+            </div>
+            <div class="investment-details">
+              <div class="invest-detail"><div class="label">Balance</div><div class="val primary">₦${Number(u.balance).toLocaleString()}</div></div>
+              <div class="invest-detail"><div class="label">Earned</div><div class="val accent">₦${Number(u.total_earned).toLocaleString()}</div></div>
+              <div class="invest-detail"><div class="label">Joined</div><div class="val">${new Date(u.created_at).toLocaleDateString()}</div></div>
+              <div class="invest-detail"><div class="label">Email</div><div class="val">${u.email || 'N/A'}</div></div>
+            </div>
+          </div>`;
+        });
+        list.innerHTML = html;
+      } catch (err) {}
+    }
+
+    function showToast(message, type) {
+      const t = document.createElement('div');
+      t.className = 'toast ' + type; t.textContent = message;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 4000);
+    }
+
+    function logout() { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/'; }
+
+    async function init() {
+      try {
+        const res = await API('/api/me');
+        const data = await res.json();
+        if (!data.user.isAdmin) { window.location.href = '/dashboard.html'; return; }
+        loadStats();
+        loadWithdrawals();
+      } catch (err) { window.location.href = '/login.html'; }
+    }
+
+    init();
+  </script>
+</body>
+</html>

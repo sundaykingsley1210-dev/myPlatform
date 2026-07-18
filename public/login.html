@@ -45,12 +45,15 @@
 
   <script>
     async function checkExistingSession() {
-      try {
-        const res = await fetch('/api/me');
-        if (res.ok) {
-          window.location.href = '/dashboard.html';
-        }
-      } catch (e) {}
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const res = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+          if (res.ok) { window.location.href = '/dashboard.html'; return; }
+        } catch (e) {}
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     }
 
     function showAlert(message, type) {
@@ -87,6 +90,8 @@
         const data = await res.json();
 
         if (res.ok) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
           showAlert(data.message, 'success');
           setTimeout(() => {
             window.location.href = '/dashboard.html';

@@ -11,14 +11,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 <body>
-  <!-- NAVBAR -->
   <nav class="navbar">
     <div class="nav-container">
-      <a href="/" class="logo">
-        <i class="fas fa-gem"></i> Enrich <span>U</span>
-      </a>
+      <a href="/" class="logo"><i class="fas fa-gem"></i> Enrich <span>U</span></a>
       <div class="nav-actions">
-        <span id="userGreeting" style="color:var(--text-secondary);font-size:0.9rem;margin-right:12px;"></span>
+        <span id="userGreeting" style="color:var(--text-secondary);font-size:0.9rem;margin-right:8px;"></span>
+        <a href="/admin.html" class="btn btn-outline" id="adminLink" style="display:none;"><i class="fas fa-shield-halved"></i> Admin</a>
         <a href="#" class="btn btn-outline" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
       </div>
     </div>
@@ -26,13 +24,11 @@
 
   <div class="dashboard-page">
     <div class="container">
-      <!-- HEADER -->
       <div class="dashboard-header">
         <h1 id="dashTitle">Welcome back!</h1>
         <p>Manage your investments and collect your daily returns</p>
       </div>
 
-      <!-- STATS -->
       <div class="dash-stats">
         <div class="dash-stat-card">
           <div class="label">Wallet Balance</div>
@@ -48,100 +44,87 @@
         </div>
       </div>
 
-      <!-- TABS -->
       <div class="dash-tabs">
-        <button class="dash-tab active" onclick="switchTab('tasks')"><i class="fas fa-list-check"></i> Daily Tasks</button>
-        <button class="dash-tab" onclick="switchTab('investments')"><i class="fas fa-chart-line"></i> My Investments</button>
-        <button class="dash-tab" onclick="switchTab('new-invest')"><i class="fas fa-plus-circle"></i> New Investment</button>
-        <button class="dash-tab" onclick="switchTab('withdraw')"><i class="fas fa-money-bill-wave"></i> Withdraw</button>
-        <button class="dash-tab" onclick="switchTab('history')"><i class="fas fa-history"></i> History</button>
+        <button class="dash-tab active" onclick="switchTab('tasks',this)"><i class="fas fa-list-check"></i> Daily Tasks</button>
+        <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
+        <button class="dash-tab" onclick="switchTab('new-invest',this)"><i class="fas fa-plus-circle"></i> New Investment</button>
+        <button class="dash-tab" onclick="switchTab('withdraw',this)"><i class="fas fa-money-bill-wave"></i> Withdraw</button>
+        <button class="dash-tab" onclick="switchTab('history',this)"><i class="fas fa-history"></i> History</button>
+        <button class="dash-tab" onclick="switchTab('notifications',this)"><i class="fas fa-bell"></i> Alerts <span id="notifBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
       </div>
 
-      <!-- PANEL: DAILY TASKS -->
       <div class="dash-panel active" id="panel-tasks">
-        <div id="taskStatusMsg" class="task-status-msg inactive">
-          <i class="fas fa-clock"></i> Checking task status...
-        </div>
+        <div id="taskStatusMsg" class="task-status-msg inactive"><i class="fas fa-clock"></i> Checking task status...</div>
         <div id="tasksList"></div>
       </div>
-
-      <!-- PANEL: MY INVESTMENTS -->
-      <div class="dash-panel" id="panel-investments">
-        <div id="investmentsList"></div>
-      </div>
-
-      <!-- PANEL: NEW INVESTMENT -->
+      <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
       <div class="dash-panel" id="panel-new-invest">
         <h3 style="margin-bottom:20px;">Select a VIP Plan to Invest</h3>
         <div class="vip-select-grid" id="vipSelectGrid"></div>
         <div id="paymentArea" style="display:none;"></div>
       </div>
-
-      <!-- PANEL: WITHDRAW -->
       <div class="dash-panel" id="panel-withdraw">
         <div id="withdrawInfo" style="margin-bottom:20px;padding:16px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border);"></div>
         <div id="withdrawForm"></div>
       </div>
-
-      <!-- PANEL: HISTORY -->
-      <div class="dash-panel" id="panel-history">
-        <div id="historyList"></div>
-      </div>
+      <div class="dash-panel" id="panel-history"><div id="historyList"></div></div>
+      <div class="dash-panel" id="panel-notifications"><div id="notifList"></div></div>
     </div>
   </div>
 
   <div id="toastContainer"></div>
 
   <script>
-    let userData = null;
-    let vipPlans = {};
-    let investments = [];
+    const API = (url, opts = {}) => {
+      const token = localStorage.getItem('token');
+      const headers = { ...(opts.headers || {}), 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      return fetch(url, { ...opts, headers }).then(async r => {
+        if (r.status === 401) { localStorage.removeItem('token'); localStorage.removeItem('user'); window.location.href = '/login.html'; return r; }
+        return r;
+      });
+    };
 
-    // ===================== INIT =====================
+    let userData = null, vipPlans = {}, investments = [];
+
     async function init() {
       try {
-        const res = await fetch('/api/me');
-        if (!res.ok) {
-          window.location.href = '/login.html';
-          return;
-        }
+        const res = await API('/api/me');
+        if (!res.ok) { window.location.href = '/login.html'; return; }
         const data = await res.json();
         userData = data.user;
         document.getElementById('userGreeting').textContent = 'Hi, ' + userData.username;
         document.getElementById('dashTitle').textContent = 'Welcome back, ' + userData.username + '!';
+        if (userData.isAdmin) document.getElementById('adminLink').style.display = '';
         updateStats();
         loadVipPlans();
         loadInvestments();
         loadTaskStatus();
         loadWithdrawInfo();
+        loadNotifications();
         setInterval(loadTaskStatus, 60000);
-      } catch (err) {
-        window.location.href = '/login.html';
-      }
+      } catch (err) { window.location.href = '/login.html'; }
     }
 
     function updateStats() {
       document.getElementById('balanceVal').textContent = '₦' + Number(userData.balance).toLocaleString();
       document.getElementById('totalEarnedVal').textContent = '₦' + Number(userData.totalEarned).toLocaleString();
-      const activeCount = investments.filter(i => i.status === 'active').length;
-      document.getElementById('activeInvestmentsVal').textContent = activeCount;
+      document.getElementById('activeInvestmentsVal').textContent = investments.filter(i => i.status === 'active').length;
     }
 
-    // ===================== TABS =====================
-    function switchTab(tab) {
+    function switchTab(tab, el) {
       document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
-      event.target.closest('.dash-tab').classList.add('active');
+      el.classList.add('active');
       document.getElementById('panel-' + tab).classList.add('active');
-
       if (tab === 'investments') loadInvestments();
       if (tab === 'tasks') { loadTaskStatus(); loadInvestments(); }
       if (tab === 'history') loadHistory();
+      if (tab === 'notifications') loadNotifications();
     }
 
-    // ===================== VIP PLANS =====================
     async function loadVipPlans() {
-      const res = await fetch('/api/vip-plans');
+      const res = await API('/api/vip-plans');
       const data = await res.json();
       vipPlans = data.plans;
       renderVipSelect();
@@ -151,150 +134,71 @@
       const grid = document.getElementById('vipSelectGrid');
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
-        html += `
-          <div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
-            <div class="level">VIP ${level}</div>
-            <div class="price">₦${plan.amount.toLocaleString()}</div>
-            <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
-          </div>
-        `;
+        html += `<div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
+          <div class="level">VIP ${level}</div>
+          <div class="price">₦${plan.amount.toLocaleString()}</div>
+          <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
+        </div>`;
       }
       grid.innerHTML = html;
     }
 
-    let selectedVip = null;
-
     function selectVip(level) {
-      selectedVip = level;
       document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
       document.getElementById('vipCard' + level).classList.add('selected');
-
       const plan = vipPlans[level];
-      const paymentArea = document.getElementById('paymentArea');
-      paymentArea.style.display = 'block';
-      paymentArea.innerHTML = `
-        <div class="payment-details-box">
-          <h3><i class="fas fa-crown" style="color:var(--gold);margin-right:8px;"></i> VIP ${level} Investment</h3>
-          <div class="payment-detail-row">
-            <span class="label">Investment Amount</span>
-            <span class="value">₦${plan.amount.toLocaleString()}</span>
-          </div>
-          <div class="payment-detail-row">
-            <span class="label">Daily Return</span>
-            <span class="value" style="color:var(--accent);">₦${plan.dailyReturn.toLocaleString()}</span>
-          </div>
-          <div class="payment-detail-row">
-            <span class="label">Withdrawal Day</span>
-            <span class="value">${plan.withdrawalDay}s</span>
-          </div>
-          <div class="payment-detail-row">
-            <span class="label">Duration</span>
-            <span class="value">2 Years</span>
-          </div>
-          <div style="margin-top:20px;text-align:center;">
-            <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn">
-              <i class="fas fa-money-bill-transfer"></i> Proceed to Payment
-            </button>
-          </div>
-          <div id="generatedPayment" style="margin-top:20px;"></div>
+      const pa = document.getElementById('paymentArea');
+      pa.style.display = 'block';
+      pa.innerHTML = `<div class="payment-details-box">
+        <h3><i class="fas fa-crown" style="color:var(--gold);margin-right:8px;"></i> VIP ${level}</h3>
+        <div class="payment-detail-row"><span class="label">Amount</span><span class="value">₦${plan.amount.toLocaleString()}</span></div>
+        <div class="payment-detail-row"><span class="label">Daily Return</span><span class="value" style="color:var(--accent);">₦${plan.dailyReturn.toLocaleString()}</span></div>
+        <div class="payment-detail-row"><span class="label">Withdrawal</span><span class="value">${plan.withdrawalDay}s</span></div>
+        <div class="payment-detail-row"><span class="label">Duration</span><span class="value">2 Years</span></div>
+        <div style="margin-top:20px;text-align:center;">
+          <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn"><i class="fas fa-money-bill-transfer"></i> Proceed to Payment</button>
         </div>
-      `;
+        <div id="generatedPayment" style="margin-top:20px;"></div>
+      </div>`;
     }
 
     async function createInvestment(level) {
       const btn = document.getElementById('investBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Generating payment details...';
-
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating...';
       try {
-        const res = await fetch('/api/create-investment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ vipLevel: level })
-        });
-
+        const res = await API('/api/create-investment', { method: 'POST', body: JSON.stringify({ vipLevel: level }) });
         const data = await res.json();
-
         if (res.ok) {
           const pd = data.paymentDetails;
           document.getElementById('generatedPayment').innerHTML = `
-            <div class="alert alert-success">
-              <i class="fas fa-check-circle"></i> Payment details generated! Transfer exactly the amount below.
-            </div>
-            <div class="payment-detail-row">
-              <span class="label">Bank Name</span>
-              <span class="value">${pd.bankName}</span>
-            </div>
-            <div class="payment-detail-row">
-              <span class="label">Account Number</span>
-              <span class="value" style="font-size:1.1rem;letter-spacing:1px;">${pd.accountNumber}</span>
-            </div>
-            <div class="payment-detail-row">
-              <span class="label">Account Name</span>
-              <span class="value">${pd.accountName}</span>
-            </div>
-            <div class="payment-detail-row">
-              <span class="label">Amount</span>
-              <span class="value" style="color:var(--primary);font-size:1.2rem;">₦${pd.amount.toLocaleString()}</span>
-            </div>
-            <div class="payment-detail-row">
-              <span class="label">Reference</span>
-              <span class="value" style="font-size:0.8rem;">${pd.reference}</span>
-            </div>
-            <div style="margin-top:16px;text-align:center;">
-              <button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')">
-                <i class="fas fa-check-double"></i> I've Made Payment
-              </button>
-            </div>
-          `;
+            <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below.</div>
+            <div class="payment-detail-row"><span class="label">Bank</span><span class="value">${pd.bankName}</span></div>
+            <div class="payment-detail-row"><span class="label">Account Number</span><span class="value" style="font-size:1.1rem;letter-spacing:1px;">${pd.accountNumber}</span></div>
+            <div class="payment-detail-row"><span class="label">Account Name</span><span class="value">${pd.accountName}</span></div>
+            <div class="payment-detail-row"><span class="label">Amount</span><span class="value" style="color:var(--primary);font-size:1.2rem;">₦${pd.amount.toLocaleString()}</span></div>
+            <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.8rem;">${pd.reference}</span></div>
+            <div style="margin-top:16px;text-align:center;"><button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')"><i class="fas fa-check-double"></i> I've Made Payment</button></div>`;
           btn.style.display = 'none';
-        } else {
-          showToast(data.error, 'error');
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
-        }
-      } catch (err) {
-        showToast('Network error. Please try again.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
-      }
+        } else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment'; }
+      } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment'; }
     }
 
     async function verifyPayment(reference) {
       try {
-        const res = await fetch('/api/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ reference })
-        });
+        const res = await API('/api/verify-payment', { method: 'POST', body: JSON.stringify({ reference }) });
         const data = await res.json();
-        if (res.ok) {
-          showToast(data.message, 'success');
-          loadInvestments();
-          loadUserData();
-          document.getElementById('paymentArea').style.display = 'none';
-          selectedVip = null;
-        } else {
-          showToast(data.error, 'error');
-        }
-      } catch (err) {
-        showToast('Verification failed. Please try again.', 'error');
-      }
+        if (res.ok) { showToast(data.message, 'success'); loadInvestments(); loadUserData(); document.getElementById('paymentArea').style.display = 'none'; }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Verification failed', 'error'); }
     }
 
     async function loadUserData() {
-      try {
-        const res = await fetch('/api/me');
-        const data = await res.json();
-        userData = data.user;
-        updateStats();
-      } catch (e) {}
+      try { const res = await API('/api/me'); const data = await res.json(); userData = data.user; updateStats(); } catch (e) {}
     }
 
-    // ===================== INVESTMENTS =====================
     async function loadInvestments() {
-      const res = await fetch('/api/my-investments');
+      const res = await API('/api/my-investments');
       const data = await res.json();
       investments = data.investments;
       updateStats();
@@ -304,188 +208,72 @@
     function renderInvestments() {
       const list = document.getElementById('investmentsList');
       if (investments.length === 0) {
-        list.innerHTML = `
-          <div class="empty-state">
-            <i class="fas fa-chart-line"></i>
-            <h3>No Investments Yet</h3>
-            <p>Start your journey by choosing a VIP plan</p>
-            <br>
-            <button class="btn btn-primary" onclick="switchTab('new-invest'); document.querySelectorAll('.dash-tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.dash-tab')[2].classList.add('active');">
-              <i class="fas fa-plus-circle"></i> Make Your First Investment
-            </button>
-          </div>
-        `;
+        list.innerHTML = `<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments Yet</h3><p>Start by choosing a VIP plan</p><br><button class="btn btn-primary" onclick="document.querySelectorAll('.dash-tab')[2].click();"><i class="fas fa-plus-circle"></i> Make First Investment</button></div>`;
         return;
       }
-
       let html = '';
       investments.forEach(inv => {
-        const plan = vipPlans[inv.vipLevel];
-        html += `
-          <div class="investment-card">
-            <div class="investment-header">
-              <div class="investment-vip">
-                <span class="vip-badge">VIP ${inv.vipLevel}</span>
-                <span class="status-badge active">${inv.status}</span>
-              </div>
-              <span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span>
-            </div>
-            <div class="investment-details">
-              <div class="invest-detail">
-                <div class="label">Invested</div>
-                <div class="val primary">₦${Number(inv.amount).toLocaleString()}</div>
-              </div>
-              <div class="invest-detail">
-                <div class="label">Daily Return</div>
-                <div class="val accent">₦${Number(inv.dailyReturn).toLocaleString()}</div>
-              </div>
-              <div class="invest-detail">
-                <div class="label">Total Collected</div>
-                <div class="val">₦${Number(inv.totalCollected).toLocaleString()}</div>
-              </div>
-              <div class="invest-detail">
-                <div class="label">Days Collected</div>
-                <div class="val">${inv.daysCollected}</div>
-              </div>
-            </div>
-            <div class="claim-btn-container">
-              <button class="btn btn-accent" onclick="claimTask(${inv.id})" id="claimBtn${inv.id}">
-                <i class="fas fa-hand-pointer"></i> Collect Today's Return (₦${Number(inv.dailyReturn).toLocaleString()})
-              </button>
-            </div>
+        html += `<div class="investment-card">
+          <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span><span class="status-badge active">${inv.status}</span></div><span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
+          <div class="investment-details">
+            <div class="invest-detail"><div class="label">Invested</div><div class="val primary">₦${Number(inv.amount).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">₦${Number(inv.dailyReturn).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Collected</div><div class="val">₦${Number(inv.totalCollected).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.daysCollected}</div></div>
           </div>
-        `;
+          <div class="claim-btn-container"><button class="btn btn-accent" onclick="claimTask(${inv.id})" id="claimBtn${inv.id}"><i class="fas fa-hand-pointer"></i> Collect (₦${Number(inv.dailyReturn).toLocaleString()})</button></div>
+        </div>`;
       });
       list.innerHTML = html;
     }
 
-    // ===================== TASKS =====================
     async function loadTaskStatus() {
       try {
-        const res = await fetch('/api/task-status');
+        const res = await API('/api/task-status');
         const data = await res.json();
         const msg = document.getElementById('taskStatusMsg');
-
-        if (data.canClaim) {
-          msg.className = 'task-status-msg active';
-          msg.innerHTML = `<i class="fas fa-check-circle"></i> ${data.message} (Nigeria Time: ${data.nigeriaTime})`;
-        } else {
-          msg.className = 'task-status-msg inactive';
-          msg.innerHTML = `<i class="fas fa-clock"></i> ${data.message} (Nigeria Time: ${data.nigeriaTime})`;
-        }
-
-        document.querySelectorAll('[id^="claimBtn"]').forEach(btn => {
-          btn.disabled = !data.canClaim;
-        });
-      } catch (err) {
-        console.error('Failed to load task status');
-      }
+        msg.className = data.canClaim ? 'task-status-msg active' : 'task-status-msg inactive';
+        msg.innerHTML = `<i class="fas fa-${data.canClaim ? 'check-circle' : 'clock'}"></i> ${data.message}`;
+        document.querySelectorAll('[id^="claimBtn"]').forEach(btn => btn.disabled = !data.canClaim);
+      } catch (err) {}
     }
 
     async function claimTask(investmentId) {
       const btn = document.getElementById('claimBtn' + investmentId);
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Processing...';
-
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Processing...';
       try {
-        const res = await fetch('/api/claim-task', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ investmentId })
-        });
+        const res = await API('/api/claim-task', { method: 'POST', body: JSON.stringify({ investmentId }) });
         const data = await res.json();
-
-        if (res.ok) {
-          showToast(data.message, 'success');
-          userData.balance = data.newBalance;
-          updateStats();
-          loadInvestments();
-        } else {
-          showToast(data.error, 'error');
-          btn.disabled = false;
-          btn.innerHTML = `<i class="fas fa-hand-pointer"></i> Collect Today's Return`;
-        }
-      } catch (err) {
-        showToast('Network error. Please try again.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = `<i class="fas fa-hand-pointer"></i> Collect Today's Return`;
-      }
+        if (res.ok) { showToast(data.message, 'success'); userData.balance = data.newBalance; updateStats(); loadInvestments(); }
+        else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-hand-pointer"></i> Collect'; }
+      } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-hand-pointer"></i> Collect'; }
     }
 
-    // ===================== WITHDRAW =====================
     async function loadWithdrawInfo() {
       const infoDiv = document.getElementById('withdrawInfo');
       const formDiv = document.getElementById('withdrawForm');
-
       const activeVips = investments.filter(i => i.status === 'active');
       const allowedDays = new Set();
-      activeVips.forEach(inv => {
-        if (vipPlans[inv.vipLevel]) {
-          allowedDays.add(vipPlans[inv.vipLevel].withdrawalDay);
-        }
-      });
+      activeVips.forEach(inv => { if (vipPlans[inv.vipLevel]) allowedDays.add(vipPlans[inv.vipLevel].withdrawalDay); });
 
-      if (activeVips.length === 0) {
-        infoDiv.innerHTML = `
-          <p style="color:var(--text-muted);text-align:center;">
-            <i class="fas fa-info-circle"></i> You need an active investment to make withdrawals.
-          </p>
-        `;
-        formDiv.innerHTML = '';
-        return;
-      }
+      if (activeVips.length === 0) { infoDiv.innerHTML = '<p style="color:var(--text-muted);text-align:center;"><i class="fas fa-info-circle"></i> You need an active investment to make withdrawals.</p>'; formDiv.innerHTML = ''; return; }
 
-      const now = new Date();
-      const nigeriaTime = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+      const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const currentDay = dayNames[nigeriaTime.getDay()];
+      const currentDay = dayNames[ng.getDay()];
       const canWithdraw = allowedDays.has(currentDay);
 
-      infoDiv.innerHTML = `
-        <p style="margin-bottom:8px;">
-          <i class="fas fa-info-circle" style="color:var(--primary);"></i>
-          <strong>Available Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${Number(userData.balance).toLocaleString()}</span>
-        </p>
-        <p style="margin-bottom:8px;">
-          <i class="fas fa-calendar" style="color:var(--accent);"></i>
-          <strong>Your Withdrawal Days:</strong> ${[...allowedDays].join(', ')}s
-        </p>
-        <p>
-          <i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i>
-          <strong>Today (${currentDay}):</strong>
-          <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Withdrawal is available!' : 'Withdrawal not available today.'}</span>
-        </p>
-      `;
+      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${Number(userData.balance).toLocaleString()}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Days:</strong> ${[...allowedDays].join(', ')}s</p>
+        <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
 
-      if (!canWithdraw) {
-        formDiv.innerHTML = '';
-        return;
-      }
-
-      formDiv.innerHTML = `
-        <div class="payment-details-box">
-          <h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw Funds</h3>
-          <div class="form-group">
-            <label>Amount (₦)</label>
-            <input type="number" id="withdrawAmount" placeholder="Enter amount" min="100" max="${userData.balance}">
-          </div>
-          <div class="form-group">
-            <label>Bank Name</label>
-            <input type="text" id="withdrawBank" placeholder="e.g. GTBank, Access Bank, etc.">
-          </div>
-          <div class="form-group">
-            <label>Account Number</label>
-            <input type="text" id="withdrawAccount" placeholder="Enter 10-digit account number" maxlength="10">
-          </div>
-          <div class="form-group">
-            <label>Account Name</label>
-            <input type="text" id="withdrawAccountName" placeholder="Enter account holder name">
-          </div>
-          <button class="btn btn-primary btn-block btn-lg" onclick="submitWithdraw()" id="withdrawBtn">
-            <i class="fas fa-paper-plane"></i> Submit Withdrawal
-          </button>
-        </div>
-      `;
+      if (!canWithdraw) { formDiv.innerHTML = ''; return; }
+      formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
+        <div class="form-group"><label>Amount</label><input type="number" id="withdrawAmount" placeholder="Enter amount" min="100" max="${userData.balance}"></div>
+        <div class="form-group"><label>Bank</label><input type="text" id="withdrawBank" placeholder="e.g. GTBank"></div>
+        <div class="form-group"><label>Account Number</label><input type="text" id="withdrawAccount" placeholder="10-digit number" maxlength="10"></div>
+        <div class="form-group"><label>Account Name</label><input type="text" id="withdrawAccountName" placeholder="Account holder name"></div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="submitWithdraw()" id="withdrawBtn"><i class="fas fa-paper-plane"></i> Submit</button></div>`;
     }
 
     async function submitWithdraw() {
@@ -494,108 +282,72 @@
       const accountNumber = document.getElementById('withdrawAccount').value.trim();
       const accountName = document.getElementById('withdrawAccountName').value.trim();
       const btn = document.getElementById('withdrawBtn');
-
-      if (!amount || amount < 100) {
-        showToast('Please enter a valid amount (min ₦100)', 'error');
-        return;
-      }
-      if (!bankName) {
-        showToast('Please enter your bank name', 'error');
-        return;
-      }
-      if (!accountNumber || accountNumber.length !== 10) {
-        showToast('Please enter a valid 10-digit account number', 'error');
-        return;
-      }
-      if (!accountName) {
-        showToast('Please enter the account holder name', 'error');
-        return;
-      }
-
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Processing...';
-
+      if (!amount || amount < 100) return showToast('Enter valid amount', 'error');
+      if (!bankName) return showToast('Enter bank name', 'error');
+      if (!accountNumber || accountNumber.length !== 10) return showToast('Enter 10-digit account number', 'error');
+      if (!accountName) return showToast('Enter account name', 'error');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Processing...';
       try {
-        const res = await fetch('/api/withdraw', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount, bankName, accountNumber, accountName })
-        });
+        const res = await API('/api/withdraw', { method: 'POST', body: JSON.stringify({ amount, bankName, accountNumber, accountName }) });
         const data = await res.json();
-
-        if (res.ok) {
-          showToast(data.message, 'success');
-          userData.balance = data.newBalance;
-          updateStats();
-          loadWithdrawInfo();
-        } else {
-          showToast(data.error, 'error');
-        }
-      } catch (err) {
-        showToast('Network error. Please try again.', 'error');
-      }
-
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Withdrawal';
+        if (res.ok) { showToast(data.message, 'success'); userData.balance = data.newBalance; updateStats(); loadWithdrawInfo(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Network error', 'error'); }
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit';
     }
 
-    // ===================== HISTORY =====================
     async function loadHistory() {
       try {
-        const res = await fetch('/api/my-withdrawals');
+        const res = await API('/api/my-withdrawals');
         const data = await res.json();
         const list = document.getElementById('historyList');
-
-        if (data.withdrawals.length === 0) {
-          list.innerHTML = `
-            <div class="empty-state">
-              <i class="fas fa-history"></i>
-              <h3>No Withdrawal History</h3>
-              <p>Your withdrawal records will appear here</p>
-            </div>
-          `;
-          return;
-        }
-
+        if (!data.withdrawals.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-history"></i><h3>No History</h3></div>'; return; }
         let html = '<h3 style="margin-bottom:16px;">Withdrawal History</h3>';
         data.withdrawals.forEach(w => {
-          const statusColor = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
-          html += `
-            <div class="withdrawal-card">
-              <div class="withdrawal-header">
-                <div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div>
-                <span class="status-badge" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}33;">${w.status}</span>
-              </div>
-              <div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);">
-                <p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p>
-                <p><i class="fas fa-user"></i> ${w.accountName}</p>
-                <p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>
-              </div>
-            </div>
-          `;
+          const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
+          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
         });
         list.innerHTML = html;
-      } catch (err) {
-        console.error('Failed to load history');
-      }
+      } catch (err) {}
     }
 
-    // ===================== UTILS =====================
+    async function loadNotifications() {
+      try {
+        const res = await API('/api/notifications');
+        const data = await res.json();
+        const list = document.getElementById('notifList');
+        const unread = (data.notifications || []).filter(n => !n.is_read).length;
+        const badge = document.getElementById('notifBadge');
+        if (unread > 0) { badge.textContent = unread; badge.style.display = 'inline'; } else { badge.style.display = 'none'; }
+
+        if (!data.notifications || !data.notifications.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-bell"></i><h3>No Notifications</h3></div>'; return; }
+        let html = '<h3 style="margin-bottom:16px;">Notifications</h3>';
+        data.notifications.forEach(n => {
+          html += `<div class="withdrawal-card" style="border-left:3px solid ${n.is_read ? 'var(--border)' : 'var(--primary)'};">
+            <div style="font-weight:700;margin-bottom:4px;">${n.title}</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);">${n.message}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">${new Date(n.created_at).toLocaleString()}</div>
+          </div>`;
+        });
+        list.innerHTML = html;
+        await API('/api/notifications/read', { method: 'POST' });
+        setTimeout(() => { badge.style.display = 'none'; }, 2000);
+      } catch (err) {}
+    }
+
     function showToast(message, type) {
-      const container = document.getElementById('toastContainer');
-      const toast = document.createElement('div');
-      toast.className = 'toast ' + type;
-      toast.textContent = message;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
+      const t = document.createElement('div');
+      t.className = 'toast ' + type; t.textContent = message;
+      document.getElementById('toastContainer').appendChild(t);
+      setTimeout(() => t.remove(), 4000);
     }
 
-    async function logout() {
-      await fetch('/api/logout', { method: 'POST' });
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.location.href = '/';
     }
 
-    // ===================== START =====================
     init();
   </script>
 </body>
