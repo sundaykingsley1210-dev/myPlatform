@@ -687,7 +687,7 @@
           <button class="btn btn-primary" onclick="updateProfile()" id="profileBtn"><i class="fas fa-save"></i> Save Changes</button>
           <h4 style="margin:24px 0 16px;">Change Password</h4>
           <div class="form-group"><label>Current Password</label><input type="password" id="currentPass" placeholder="Enter current password"></div>
-          <div class="form-group"><label>New Password</label><input type="password" id="newPass" placeholder="Min 8 characters"></div>
+          <div class="form-group"><label>New Password</label><input type="password" id="newPass" placeholder="Min 6 characters"></div>
           <button class="btn btn-accent" onclick="changePassword()" id="passBtn"><i class="fas fa-lock"></i> Change Password</button>
         </div>`;
       } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
@@ -716,7 +716,7 @@
       const current = document.getElementById('currentPass').value;
       const newP = document.getElementById('newPass').value;
       if (!current || !newP) return showToast('Fill all fields', 'error');
-      if (newP.length < 8) return showToast('Min 8 characters', 'error');
+      if (newP.length < 6) return showToast('Min 6 characters', 'error');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Changing...';
       try {
         const res = await API('/api/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: current, newPassword: newP })});

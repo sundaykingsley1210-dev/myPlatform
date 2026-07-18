@@ -33,7 +33,7 @@
         <div class="form-group">
           <label for="password"><i class="fas fa-lock"></i> Password</label>
           <div class="password-input-wrap">
-            <input type="password" id="password" placeholder="Create a strong password (min 8 characters)" required minlength="8" oninput="checkPasswordStrength()" autocomplete="new-password">
+            <input type="password" id="password" placeholder="Create a password (min 6 characters)" required minlength="6" oninput="checkPasswordStrength()" autocomplete="new-password">
             <button type="button" class="toggle-pass" onclick="togglePass('password',this)"><i class="fas fa-eye"></i></button>
           </div>
           <div class="password-strength">
@@ -86,8 +86,8 @@
       }
 
       let score = 0;
-      if (password.length >= 8) score++;
-      if (password.length >= 12) score++;
+      if (password.length >= 6) score++;
+      if (password.length >= 10) score++;
       if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
       if (/[0-9]/.test(password)) score++;
       if (/[^A-Za-z0-9]/.test(password)) score++;
@@ -129,8 +129,8 @@
         return;
       }
 
-      if (password.length < 8) {
-        showAlert('Password must be at least 8 characters', 'error');
+      if (password.length < 6) {
+        showAlert('Password must be at least 6 characters', 'error');
         return;
       }
 

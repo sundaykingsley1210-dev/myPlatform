@@ -70,7 +70,7 @@ app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
   if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
   try {
     const existing = await dbQuery('users', 'id', { username });
@@ -101,8 +101,11 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
   try {
-    const result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { username }, { single: true });
-    if (!result.data) return res.status(400).json({ error: 'Invalid username or password' });
+    let result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { username }, { single: true });
+    if (!result.data && username.includes('@')) {
+      result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { email: username }, { single: true });
+    }
+    if (!result.data) return res.status(400).json({ error: 'Invalid username/email or password' });
 
     const user = result.data;
     const valid = await bcrypt.compare(password, user.password);
@@ -467,7 +470,7 @@ app.put('/api/profile', requireAuth, async (req, res) => {
 app.post('/api/change-password', requireAuth, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'All fields required' });
-  if (newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
   try {
     const result = await dbQuery('users', 'password', { id: req.userId }, { single: true });
     const valid = await bcrypt.compare(currentPassword, result.data.password);
@@ -481,13 +484,19 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
 // ===================== FORGOT PASSWORD =====================
 app.post('/api/forgot-password', async (req, res) => {
   const { username, email } = req.body;
-  if (!username || !email) return res.status(400).json({ error: 'Username and email required' });
+  if (!email) return res.status(400).json({ error: 'Email address is required' });
   try {
-    const result = await dbQuery('users', 'id, username, email', { username, email }, { single: true });
-    if (!result.data) return res.status(400).json({ error: 'No account found with these details' });
+    let user = null;
+    const emailResult = await dbQuery('users', 'id, username, email', { email }, { single: true });
+    if (emailResult.data) { user = emailResult.data; }
+    else if (username) {
+      const usernameResult = await dbQuery('users', 'id, username, email', { username }, { single: true });
+      if (usernameResult.data) user = usernameResult.data;
+    }
+    if (!user) return res.status(400).json({ error: 'No account found with this email address' });
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 15 * 60 * 1000);
-    await dbUpdate('users', { reset_code: code, reset_expires: expires.toISOString() }, { id: result.data.id });
+    await dbUpdate('users', { reset_code: code, reset_expires: expires.toISOString() }, { id: user.id });
     try {
       const transporter = require('nodemailer').createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -500,14 +509,14 @@ app.post('/api/forgot-password', async (req, res) => {
           from: process.env.SMTP_FROM || 'Enrich U <noreply@enrichu.com>',
           to: email,
           subject: 'Password Reset Code - Enrich U',
-          html: `<div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:20px;"><h2 style="color:#0057ff;">Password Reset</h2><p>Hi ${result.data.username},</p><p>Your password reset code is:</p><div style="text-align:center;padding:20px;background:#f5f5f5;border-radius:8px;margin:20px 0;"><span style="font-size:32px;font-weight:900;color:#0057ff;letter-spacing:5px;">${code}</span></div><p style="color:#666;font-size:0.85rem;">This code expires in 15 minutes. If you didn't request this, ignore this email.</p></div>`
+          html: `<div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:20px;"><h2 style="color:#0057ff;">Password Reset</h2><p>Hi ${user.username},</p><p>Your 6-digit verification code is:</p><div style="text-align:center;padding:20px;background:#f5f5f5;border-radius:8px;margin:20px 0;"><span style="font-size:36px;font-weight:900;color:#0057ff;letter-spacing:8px;">${code}</span></div><p style="color:#666;font-size:0.85rem;">This code expires in 15 minutes. If you didn't request this, ignore this email.</p><p style="color:#999;font-size:0.75rem;">Enrich U — Enriching Lives</p></div>`
         });
-        res.json({ success: true, message: 'Reset code sent to your email' });
+        res.json({ success: true, message: 'Verification code sent to ' + email });
       } else {
-        res.json({ success: true, message: 'Reset code generated. Email not configured — contact support.', code });
+        res.json({ success: true, message: 'Verification code generated. Email not configured — contact support.', code });
       }
     } catch (e) {
-      res.json({ success: true, message: 'Reset code generated. Email not configured — contact support.', code });
+      res.json({ success: true, message: 'Verification code generated. Email not configured — contact support.', code });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -515,14 +524,14 @@ app.post('/api/forgot-password', async (req, res) => {
 app.post('/api/reset-password', async (req, res) => {
   const { username, code, newPassword } = req.body;
   if (!username || !code || !newPassword) return res.status(400).json({ error: 'All fields required' });
-  if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be 6 digits' });
   try {
     const result = await dbQuery('users', 'id, reset_code, reset_expires', { username }, { single: true });
-    if (!result.data || result.data.reset_code !== code) return res.status(400).json({ error: 'Invalid reset code' });
-    if (new Date(result.data.reset_expires) < new Date()) return res.status(400).json({ error: 'Reset code has expired' });
+    if (!result.data || result.data.reset_code !== code) return res.status(400).json({ error: 'Invalid verification code' });
+    if (new Date(result.data.reset_expires) < new Date()) return res.status(400).json({ error: 'Verification code has expired. Request a new one.' });
     const hashed = await bcrypt.hash(newPassword, 10);
     await dbUpdate('users', { password: hashed, reset_code: null, reset_expires: null }, { id: result.data.id });
-    res.json({ success: true, message: 'Password reset successful. You can now login.' });
+    res.json({ success: true, message: 'Password reset successful. You can now login with your new password.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
