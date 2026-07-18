@@ -102,6 +102,10 @@
       try {
         const res = await API('/api/admin/withdrawals');
         const data = await res.json();
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        const userMap = {};
+        (usersData.users || []).forEach(u => { userMap[u.id] = u; });
         const list = document.getElementById('withdrawalsList');
         if (!data.withdrawals || !data.withdrawals.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-money-bill-wave"></i><h3>No Withdrawals</h3></div>'; return; }
         let html = '';
@@ -109,11 +113,16 @@
           const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
           const vat = w.vat_amount || Math.round(Number(w.amount) * 0.10);
           const credit = w.credit_amount || (Number(w.amount) - vat);
+          const u = userMap[w.user_id] || {};
+          const displayName = u.nickname || u.username || 'User #' + w.user_id;
           html += `<div class="investment-card">
             <div class="investment-header">
-              <div class="investment-vip"><span style="font-size:1.1rem;font-weight:700;color:var(--primary);">₦${Number(w.amount).toLocaleString()}</span>
-              <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div>
-              <span style="font-size:0.8rem;color:var(--text-muted);">User ID: ${w.user_id}</span>
+              <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
+                ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);">' : '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.75rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
+                <span style="font-size:1.1rem;font-weight:700;color:var(--primary);">₦${Number(w.amount).toLocaleString()}</span>
+                <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span>
+              </div>
+              <span style="font-size:0.8rem;color:var(--text-muted);">${displayName}</span>
             </div>
             <div class="investment-details">
               <div class="invest-detail"><div class="label">Bank</div><div class="val">${w.bank_name}</div></div>
@@ -166,8 +175,11 @@
           const displayName = u.nickname || u.username;
           html += `<div class="investment-card">
             <div class="investment-header">
-              <div class="investment-vip"><span style="font-weight:700;">${displayName}</span>
-              ${u.is_admin ? '<span class="status-badge" style="background:rgba(0,87,255,0.1);color:var(--primary);border:1px solid rgba(0,87,255,0.2);">ADMIN</span>' : ''}</div>
+              <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
+                ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);">' : '<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.85rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
+                <div><span style="font-weight:700;">${displayName}</span>
+                ${u.is_admin ? '<span class="status-badge" style="background:rgba(0,87,255,0.1);color:var(--primary);border:1px solid rgba(0,87,255,0.2);margin-left:6px;">ADMIN</span>' : ''}</div>
+              </div>
               <span style="font-size:0.8rem;color:var(--text-muted);">ID: ${u.id} ${u.nickname ? '(@' + u.username + ')' : ''}</span>
             </div>
             <div class="investment-details">
@@ -175,9 +187,12 @@
               <div class="invest-detail"><div class="label">Earned</div><div class="val accent">₦${Number(u.total_earned).toLocaleString()}</div></div>
               <div class="invest-detail"><div class="label">Joined</div><div class="val">${new Date(u.created_at).toLocaleDateString()}</div></div>
               <div class="invest-detail"><div class="label">Email</div><div class="val">${u.email || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Phone</div><div class="val">${u.phone || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Referral</div><div class="val" style="font-size:0.75rem;">${u.referral_code || 'N/A'}</div></div>
             </div>
             ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-              <button class="btn btn-accent btn-sm" onclick="creditBalance(${u.id},'${displayName}')"><i class="fas fa-plus-circle"></i> Credit Balance</button>
+              <button class="btn btn-accent btn-sm" onclick="creditBalance(${u.id},'${displayName}')"><i class="fas fa-plus-circle"></i> Credit</button>
+              <button class="btn btn-outline btn-sm" onclick="editUser(${u.id},'${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
               <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${displayName}')"><i class="fas fa-trash"></i> Delete</button>
             </div>` : ''}
           </div>`;
@@ -199,6 +214,10 @@
         html += '</div><div id="transactionsListInner"></div>';
         list.innerHTML = html;
         window._allTransactions = data.transactions;
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        window._userMap = {};
+        (usersData.users || []).forEach(u => { window._userMap[u.id] = u; });
         renderTransactions(data.transactions);
       } catch (err) { document.getElementById('transactionsList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load transactions</h3></div>'; }
     }
@@ -210,15 +229,18 @@
       let html = '';
       txs.forEach(tx => {
         const c = tx.status === 'completed' ? '#22c55e' : tx.status === 'pending' ? '#f59e0b' : '#ef4444';
-        const icon = tx.type === 'investment' ? 'fa-arrow-up' : tx.type === 'withdrawal' ? 'fa-arrow-down' : 'fa-exchange-alt';
+        const icon = tx.type === 'investment' ? 'fa-arrow-up' : tx.type === 'withdrawal' ? 'fa-arrow-down' : tx.type === 'referral_bonus' ? 'fa-user-friends' : tx.type === 'admin_credit' ? 'fa-plus-circle' : 'fa-exchange-alt';
+        const u = (window._userMap || {})[tx.user_id] || {};
+        const displayName = u.nickname || u.username || 'User #' + tx.user_id;
         html += `<div class="investment-card" style="border-left:3px solid ${c};">
           <div class="investment-header">
-            <div class="investment-vip">
-              <span style="font-weight:700;color:${tx.type === 'investment' ? 'var(--accent)' : 'var(--primary)'};">₦${Number(tx.amount).toLocaleString()}</span>
+            <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
+              ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);">' : '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.7rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
+              <span style="font-weight:700;color:${tx.type === 'investment' ? 'var(--accent)' : tx.type === 'referral_bonus' ? '#a855f7' : 'var(--primary)'};">₦${Number(tx.amount).toLocaleString()}</span>
               <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${tx.status}</span>
               <span style="font-size:0.7rem;padding:3px 8px;background:rgba(255,255,255,0.05);border-radius:8px;color:var(--text-muted);"><i class="fas ${icon}"></i> ${tx.type}</span>
             </div>
-            <span style="font-size:0.8rem;color:var(--text-muted);">User ID: ${tx.user_id}</span>
+            <span style="font-size:0.8rem;color:var(--text-muted);">${displayName}</span>
           </div>
           <div class="investment-details">
             <div class="invest-detail"><div class="label">Bank</div><div class="val">${tx.bank_name || 'N/A'}</div></div>
@@ -246,18 +268,25 @@
       try {
         const res = await API('/api/admin/investments');
         const data = await res.json();
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        const userMap = {};
+        (usersData.users || []).forEach(u => { userMap[u.id] = u; });
         const list = document.getElementById('investmentsList');
         if (!data.investments || !data.investments.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>'; return; }
         let html = '';
         data.investments.forEach(inv => {
           const c = inv.status === 'active' ? '#22c55e' : '#ef4444';
+          const u = userMap[inv.user_id] || {};
+          const displayName = u.nickname || u.username || 'User #' + inv.user_id;
           html += `<div class="investment-card" style="border-left:3px solid ${c};">
             <div class="investment-header">
-              <div class="investment-vip">
+              <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
+                ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);">' : '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.75rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
                 <span class="vip-badge">VIP ${inv.vip_level}</span>
                 <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${inv.status}</span>
               </div>
-              <span style="font-size:0.8rem;color:var(--text-muted);">User ID: ${inv.user_id}</span>
+              <span style="font-size:0.8rem;color:var(--text-muted);">${displayName}</span>
             </div>
             <div class="investment-details">
               <div class="invest-detail"><div class="label">Amount</div><div class="val primary">₦${Number(inv.amount).toLocaleString()}</div></div>
@@ -383,8 +412,8 @@
         const area = document.getElementById('activityLog');
         if (!data.activities || !data.activities.length) { area.innerHTML = '<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><h3>No Activity Yet</h3><p>Platform activity will appear here in real-time</p></div>'; return; }
         let html = '<div style="margin-bottom:16px;"><p style="color:var(--text-secondary);font-size:0.85rem;">Showing latest 100 activities across the platform</p></div>';
-        const typeIcons = { investment: 'fa-arrow-trend-up', withdrawal: 'fa-money-bill-wave', task_claim: 'fa-list-check', message: 'fa-comment' };
-        const typeColors = { investment: '#22c55e', withdrawal: '#f59e0b', task_claim: '#0057ff', message: '#a855f7' };
+        const typeIcons = { investment: 'fa-arrow-trend-up', withdrawal: 'fa-money-bill-wave', task_claim: 'fa-list-check', message: 'fa-comment', admin_credit: 'fa-plus-circle' };
+        const typeColors = { investment: '#22c55e', withdrawal: '#f59e0b', task_claim: '#0057ff', message: '#a855f7', admin_credit: '#22c55e' };
         data.activities.forEach(a => {
           const icon = typeIcons[a.type] || 'fa-circle';
           const color = typeColors[a.type] || '#666';
@@ -471,6 +500,35 @@
       const icon = btn.querySelector('i');
       if (inp.type === 'password') { inp.type = 'text'; icon.className = 'fas fa-eye-slash'; }
       else { inp.type = 'password'; icon.className = 'fas fa-eye'; }
+    }
+
+    function editUser(id, name, email, phone, nickname) {
+      const area = document.getElementById('usersList');
+      const card = document.createElement('div');
+      card.className = 'vip-detail-card';
+      card.id = 'editUserCard';
+      card.innerHTML = `<h3 style="margin-bottom:16px;"><i class="fas fa-pen" style="color:var(--primary);margin-right:8px;"></i> Edit User: ${name}</h3>
+        <div class="form-group"><label>Nickname</label><input type="text" id="editNickname" value="${nickname}"></div>
+        <div class="form-group"><label>Email</label><input type="email" id="editEmail" value="${email}"></div>
+        <div class="form-group"><label>Phone</label><input type="tel" id="editPhone" value="${phone}"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="saveUserEdit(${id})"><i class="fas fa-save"></i> Save</button>
+          <button class="btn btn-outline" onclick="document.getElementById('editUserCard').remove()"><i class="fas fa-times"></i> Cancel</button>
+        </div>`;
+      area.prepend(card);
+    }
+
+    async function saveUserEdit(id) {
+      try {
+        const res = await API('/api/admin/edit-user/' + id, { method: 'POST', body: JSON.stringify({
+          nickname: document.getElementById('editNickname').value,
+          email: document.getElementById('editEmail').value,
+          phone: document.getElementById('editPhone').value
+        })});
+        const data = await res.json();
+        if (res.ok) { showToast('User updated', 'success'); document.getElementById('editUserCard').remove(); loadUsers(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
     }
 
     function showToast(message, type) {

@@ -324,7 +324,7 @@ app.post('/api/notifications/read', requireAuth, async (req, res) => {
 // ===================== ADMIN ROUTES =====================
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, email, balance, total_earned, is_admin, created_at', {}, { order: { column: 'created_at', ascending: false } });
+    const result = await dbQuery('users', 'id, username, email, phone, balance, total_earned, is_admin, created_at, nickname, avatar_url, referral_code, referred_by', {}, { order: { column: 'created_at', ascending: false } });
     res.json({ users: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -641,28 +641,32 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
 app.get('/api/admin/activity-log', requireAuth, requireAdmin, async (req, res) => {
   try {
     const allActivities = [];
-    const users = await dbQuery('users', 'id, username, nickname');
+    const users = await dbQuery('users', 'id, username, nickname, avatar_url');
     const userMap = {};
-    (users.data || []).forEach(u => { userMap[u.id] = u.nickname || u.username; });
+    (users.data || []).forEach(u => { userMap[u.id] = { name: u.nickname || u.username, avatar: u.avatar_url }; });
 
     const investments = await dbQuery('investments', 'id, user_id, vip_level, amount, status, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
     (investments.data || []).forEach(i => {
-      allActivities.push({ type: 'investment', user: userMap[i.user_id] || 'User #' + i.user_id, detail: `VIP ${i.vip_level} — ₦${Number(i.amount).toLocaleString()}`, status: i.status, time: i.created_at });
+      const u = userMap[i.user_id] || { name: 'User #' + i.user_id };
+      allActivities.push({ type: 'investment', user: u.name, avatar: u.avatar, detail: `VIP ${i.vip_level} — ₦${Number(i.amount).toLocaleString()}`, status: i.status, time: i.created_at });
     });
 
     const withdrawals = await dbQuery('withdrawals', 'id, user_id, amount, status, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
     (withdrawals.data || []).forEach(w => {
-      allActivities.push({ type: 'withdrawal', user: userMap[w.user_id] || 'User #' + w.user_id, detail: `₦${Number(w.amount).toLocaleString()}`, status: w.status, time: w.created_at });
+      const u = userMap[w.user_id] || { name: 'User #' + w.user_id };
+      allActivities.push({ type: 'withdrawal', user: u.name, avatar: u.avatar, detail: `₦${Number(w.amount).toLocaleString()}`, status: w.status, time: w.created_at });
     });
 
     const taskClaims = await dbQuery('task_claims', 'id, user_id, investment_id, amount, claim_date', {}, { order: { column: 'claim_date', ascending: false }, limit: 50 });
     (taskClaims.data || []).forEach(t => {
-      allActivities.push({ type: 'task_claim', user: userMap[t.user_id] || 'User #' + t.user_id, detail: `₦${Number(t.amount).toLocaleString()} on ${t.claim_date}`, status: 'completed', time: t.claim_date });
+      const u = userMap[t.user_id] || { name: 'User #' + t.user_id };
+      allActivities.push({ type: 'task_claim', user: u.name, avatar: u.avatar, detail: `₦${Number(t.amount).toLocaleString()} on ${t.claim_date}`, status: 'completed', time: t.claim_date });
     });
 
     const messages = await dbQuery('messages', 'id, user_id, sender, message, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
     (messages.data || []).forEach(m => {
-      allActivities.push({ type: 'message', user: userMap[m.user_id] || 'User #' + m.user_id, detail: (m.sender === 'admin' ? 'Admin' : 'User') + ': ' + m.message.substring(0, 80), status: m.sender, time: m.created_at });
+      const u = userMap[m.user_id] || { name: 'User #' + m.user_id };
+      allActivities.push({ type: 'message', user: u.name, avatar: u.avatar, detail: (m.sender === 'admin' ? 'Admin' : 'User') + ': ' + m.message.substring(0, 80), status: m.sender, time: m.created_at });
     });
 
     allActivities.sort((a, b) => new Date(b.time) - new Date(a.time));
@@ -683,6 +687,14 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
     await dbInsert('transactions', { user_id: parseInt(userId), type: 'admin_credit', vip_level: 0, amount: parseFloat(amount), status: 'completed', reference: 'ADMIN-' + Date.now(), bank_name: '', account_number: '', account_name: '' });
     await dbInsert('notifications', { user_id: parseInt(userId), title: 'Balance Credited', message: `Admin credited ₦${parseFloat(amount).toLocaleString()} to your wallet.` });
     res.json({ success: true, message: `₦${parseFloat(amount).toLocaleString()} added to user's wallet` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
+  const { nickname, email, phone } = req.body;
+  try {
+    await dbUpdate('users', { nickname: nickname || '', email: email || '', phone: phone || '' }, { id: parseInt(req.params.id) });
+    res.json({ success: true, message: 'User updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

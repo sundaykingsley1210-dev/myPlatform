@@ -680,7 +680,25 @@
           </div>
           <h4 style="margin:24px 0 16px;">Update Info</h4>
           <div class="form-group"><label>Nickname (optional)</label><input type="text" id="profileNickname" value="${u.nickname || ''}" placeholder="Display name on dashboard"></div>
-          <div class="form-group"><label>Profile Picture URL (optional)</label><input type="url" id="profileAvatar" value="${u.avatarUrl || ''}" placeholder="https://example.com/photo.jpg"></div>
+          <div class="form-group">
+            <label>Profile Picture</label>
+            <div style="text-align:center;margin-bottom:12px;">
+              <div id="avatarPreview" style="width:80px;height:80px;border-radius:50%;margin:0 auto;overflow:hidden;border:3px solid var(--primary);background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;">
+                ${u.avatarUrl ? '<img src="' + u.avatarUrl + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'<i class=\\\'fas fa-user\\\' style=\\\'font-size:2rem;color:white\\\'></i>\'">' : '<i class="fas fa-user" style="font-size:2rem;color:white;"></i>'}
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <label class="btn btn-outline btn-sm" style="flex:1;cursor:pointer;text-align:center;">
+                <i class="fas fa-camera"></i> Camera
+                <input type="file" accept="image/*" capture="user" onchange="handleAvatarUpload(event)" style="display:none;">
+              </label>
+              <label class="btn btn-outline btn-sm" style="flex:1;cursor:pointer;text-align:center;">
+                <i class="fas fa-image"></i> Gallery
+                <input type="file" accept="image/*" onchange="handleAvatarUpload(event)" style="display:none;">
+              </label>
+            </div>
+            <input type="hidden" id="profileAvatar">
+          </div>
           <div class="form-group"><label>Full Name</label><input type="text" id="profileName" value="${u.fullName || ''}" placeholder="Your full name"></div>
           <div class="form-group"><label>Email</label><input type="email" id="profileEmail" value="${u.email || ''}" placeholder="your@email.com"></div>
           <div class="form-group"><label>Phone</label><input type="tel" id="profilePhone" value="${u.phone || ''}" placeholder="Phone number"></div>
@@ -709,6 +727,31 @@
         else showToast(data.error, 'error');
       } catch (err) { showToast('Failed', 'error'); }
       btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    }
+
+    function handleAvatarUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { showToast('Image must be under 2MB', 'error'); return; }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const size = 200;
+          canvas.width = size; canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          const min = Math.min(img.width, img.height);
+          const sx = (img.width - min) / 2, sy = (img.height - min) / 2;
+          ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+          const base64 = canvas.toDataURL('image/jpeg', 0.7);
+          document.getElementById('profileAvatar').value = base64;
+          document.getElementById('avatarPreview').innerHTML = '<img src="' + base64 + '" style="width:100%;height:100%;object-fit:cover;">';
+          showToast('Photo selected — tap Save to update', 'success');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     }
 
     async function changePassword() {
