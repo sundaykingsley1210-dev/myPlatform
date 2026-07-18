@@ -422,6 +422,41 @@ app.get('/api/setup-admin', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/setup-columns', async (req, res) => {
+  try {
+    if (!isSupabase()) return res.json({ success: false, message: 'Not using Supabase' });
+    const { supabase } = require('../database');
+    const sb = supabase();
+    const results = [];
+    const columns = [
+      { table: 'users', col: 'referral_code', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'referred_by', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'reset_code', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'reset_expires', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'nickname', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'avatar_url', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'full_name', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'phone', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'email', type: "TEXT DEFAULT ''" },
+      { table: 'users', col: 'is_admin', type: "BOOLEAN DEFAULT false" },
+      { table: 'transactions', col: 'vip_level', type: 'INTEGER DEFAULT 0' },
+      { table: 'withdrawals', col: 'vat_amount', type: 'REAL DEFAULT 0' },
+      { table: 'withdrawals', col: 'credit_amount', type: 'REAL DEFAULT 0' },
+    ];
+    for (const c of columns) {
+      try {
+        const { error } = await sb.rpc('exec_sql', { query: `ALTER TABLE ${c.table} ADD COLUMN IF NOT EXISTS ${c.col} ${c.type}` });
+        if (error) results.push(`${c.table}.${c.col}: ${error.message}`);
+        else results.push(`${c.table}.${c.col}: OK`);
+      } catch (e) { results.push(`${c.table}.${c.col}: ${e.message}`); }
+    }
+    try { await sb.from('messages').select('id').limit(1); results.push('messages: exists'); } catch (e) {
+      try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT 'user', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('messages: created'); } catch (e2) { results.push('messages: ' + e2.message); }
+    }
+    res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/config-status', (req, res) => {
   res.json({
     monnify: monnifyConfigured ? 'configured' : 'not configured',
