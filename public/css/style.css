@@ -1305,6 +1305,16 @@ body {
   color: var(--gold);
 }
 
+.dash-stat-card .value.pulse {
+  animation: valuePulse 0.6s ease;
+}
+
+@keyframes valuePulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); opacity: 0.8; }
+  100% { transform: scale(1); }
+}
+
 .dash-tabs {
   display: flex;
   gap: 4px;

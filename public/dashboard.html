@@ -34,15 +34,15 @@
 
       <div class="dash-stats">
         <div class="dash-stat-card">
-          <div class="label">Wallet Balance</div>
+          <div class="label"><i class="fas fa-wallet" style="margin-right:6px;"></i> Wallet Balance</div>
           <div class="value primary" id="balanceVal">₦0.00</div>
         </div>
         <div class="dash-stat-card">
-          <div class="label">Total Earned</div>
+          <div class="label"><i class="fas fa-chart-line" style="margin-right:6px;"></i> Total Earned</div>
           <div class="value accent" id="totalEarnedVal">₦0.00</div>
         </div>
         <div class="dash-stat-card">
-          <div class="label">My VIP Level</div>
+          <div class="label"><i class="fas fa-crown" style="margin-right:6px;"></i> My VIP Level</div>
           <div class="value gold" id="myVipLevel">None</div>
         </div>
       </div>
@@ -132,10 +132,19 @@
         const res = await API('/api/me');
         if (!res.ok) return;
         const data = await res.json();
-        userData.balance = data.user.balance;
-        userData.totalEarned = data.user.totalEarned;
-        document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
-        document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+        const newBal = data.user.balance;
+        const newEarned = data.user.totalEarned;
+        if (userData.balance !== newBal || userData.totalEarned !== newEarned) {
+          userData.balance = newBal;
+          userData.totalEarned = newEarned;
+          updateStats();
+          document.getElementById('balanceVal').classList.add('pulse');
+          document.getElementById('totalEarnedVal').classList.add('pulse');
+          setTimeout(() => {
+            document.getElementById('balanceVal').classList.remove('pulse');
+            document.getElementById('totalEarnedVal').classList.remove('pulse');
+          }, 600);
+        }
       } catch (e) {}
     }
 
