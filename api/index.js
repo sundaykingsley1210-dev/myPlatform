@@ -352,6 +352,19 @@ app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== SETUP ADMIN =====================
+app.get('/api/setup-admin', async (req, res) => {
+  try {
+    const result = await dbQuery('users', 'id', { username: 'admin' }, { single: true });
+    if (result.data) {
+      await dbUpdate('users', { is_admin: true }, { username: 'admin' });
+      res.json({ success: true, message: 'Admin user is_admin set to true' });
+    } else {
+      res.json({ success: false, message: 'No admin user found' });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== HTML ROUTES =====================
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'register.html')));
