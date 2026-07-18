@@ -120,7 +120,7 @@ async function dbQuery(table, columns = '*', filters = {}, options = {}) {
   if (options.limit) query = query.limit(options.limit);
   if (options.single) query = query.single();
   const result = await query;
-  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const memResult = memSelect(table, columns, filters, options);
     if (options.single) return { data: memResult, error: null };
@@ -135,7 +135,7 @@ async function dbInsert(table, data) {
     return { data: [row], error: null };
   }
   const result = await supabase.from(table).insert(data).select();
-  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const row = memInsert(table, data);
     return { data: [row], error: null };
@@ -151,7 +151,7 @@ async function dbUpdate(table, data, filters) {
   let query = supabase.from(table).update(data);
   for (const [key, value] of Object.entries(filters)) { query = query.eq(key, value); }
   const result = await query;
-  if (result.error && result.error.message && result.error.message.includes('does not exist')) {
+  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const rows = memUpdate(table, data, filters);
     return { data: rows, error: null };
