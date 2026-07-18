@@ -450,8 +450,9 @@ app.get('/api/setup-admin', async (req, res) => {
   try {
     const result = await dbQuery('users', 'id', { username: 'admin' }, { single: true });
     if (result.data) {
-      await dbUpdate('users', { is_admin: true }, { username: 'admin' });
-      res.json({ success: true, message: 'Admin user is_admin set to true' });
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await dbUpdate('users', { is_admin: true, password: hashedPassword }, { username: 'admin' });
+      res.json({ success: true, message: 'Admin user reset: username=admin, password=admin123' });
     } else {
       res.json({ success: false, message: 'No admin user found' });
     }
