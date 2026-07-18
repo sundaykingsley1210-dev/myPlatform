@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Admin Panel - Enrich U</title>
@@ -41,6 +42,7 @@
         <button class="dash-tab" onclick="switchTab('transactions',this)"><i class="fas fa-exchange-alt"></i> Transactions</button>
         <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
+        <button class="dash-tab" onclick="switchTab('data',this)"><i class="fas fa-database"></i> Data</button>
         <button class="dash-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
       </div>
 
@@ -48,6 +50,7 @@
       <div class="dash-panel" id="panel-transactions"><div id="transactionsList"></div></div>
       <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
       <div class="dash-panel" id="panel-support"><div id="supportList"></div></div>
+      <div class="dash-panel" id="panel-data"><div id="dataManage"></div></div>
       <div class="dash-panel" id="panel-users"><div id="usersList"></div></div>
     </div>
   </div>
@@ -75,6 +78,7 @@
       if (tab === 'transactions') loadTransactions();
       if (tab === 'investments') loadAdminInvestments();
       if (tab === 'support') loadAdminSupport();
+      if (tab === 'data') loadDataManage();
     }
 
     async function loadStats() {
@@ -212,8 +216,9 @@
             <div class="invest-detail"><div class="label">Reference</div><div class="val" style="font-size:0.7rem;word-break:break-all;">${tx.reference || 'N/A'}</div></div>
             <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(tx.created_at).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">VIP Level</div><div class="val">${tx.vip_level ? 'VIP ' + tx.vip_level : 'N/A'}</div></div>
-          </div>
-        </div>`;
+            </div>
+            ${!u.is_admin ? '<div style="margin-top:12px;text-align:center;"><button class="btn btn-danger btn-sm" onclick="deleteUser(' + u.id + ',\'' + u.username + '\')"><i class="fas fa-trash"></i> Delete User</button></div>' : ''}
+          </div>`;
       });
       inner.innerHTML = html;
     }
@@ -288,6 +293,60 @@
         }
         list.innerHTML = html;
       } catch (err) { document.getElementById('supportList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    function loadDataManage() {
+      const area = document.getElementById('dataManage');
+      area.innerHTML = `<div class="vip-detail-card">
+        <h3 style="margin-bottom:16px;"><i class="fas fa-database" style="color:var(--primary);margin-right:8px;"></i> Data Management</h3>
+        <p style="color:var(--text-secondary);margin-bottom:20px;font-size:0.9rem;">Clear data from the platform. Be careful — this cannot be undone.</p>
+        <div style="display:grid;gap:12px;">
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Transactions</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all payment transactions</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('transactions')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Withdrawals</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all withdrawal records</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('withdrawals')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Task Claims</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all daily task claims</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('task_claims')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Notifications</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all notifications</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('notifications')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Messages</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all support messages</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('messages')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+            <div><strong>Investments</strong><br><span style="font-size:0.8rem;color:var(--text-muted);">Clear all investment records</span></div>
+            <button class="btn btn-danger btn-sm" onclick="clearData('investments')"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function clearData(table) {
+      if (!confirm('Are you sure you want to clear all ' + table + '? This cannot be undone.')) return;
+      try {
+        const res = await API('/api/admin/clear-all', { method: 'POST', body: JSON.stringify({ table }) });
+        const data = await res.json();
+        if (res.ok) { showToast(data.message, 'success'); loadStats(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+    }
+
+    async function deleteUser(id, username) {
+      if (!confirm('Delete user "' + username + '" and ALL their data? This cannot be undone.')) return;
+      try {
+        const res = await API('/api/admin/delete-user/' + id, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) { showToast('User deleted', 'success'); loadUsers(); loadStats(); }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
     }
 
     async function sendAdminReply(userId) {

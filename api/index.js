@@ -429,6 +429,17 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0' }); results.push('transactions.vip_level added'); } catch (e) { results.push('transactions.vip_level: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS vat_amount REAL DEFAULT 0' }); results.push('withdrawals.vat_amount added'); } catch (e) { results.push('withdrawals.vat_amount: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS credit_amount REAL DEFAULT 0' }); results.push('withdrawals.credit_amount added'); } catch (e) { results.push('withdrawals.credit_amount: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT \'\'' }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT \'\'' }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT DEFAULT \'\'' }); results.push('users.reset_code added'); } catch (e) { results.push('users.reset_code: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TEXT DEFAULT \'\'' }); results.push('users.reset_expires added'); } catch (e) { results.push('users.reset_expires: ' + e.message); }
+    try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
+    try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
+    try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
+    try { await sb.from('task_claims').delete().neq('id', 0); results.push('task_claims cleared'); } catch (e) { results.push('clear task_claims: ' + e.message); }
+    try { await sb.from('notifications').delete().neq('id', 0); results.push('notifications cleared'); } catch (e) { results.push('clear notifications: ' + e.message); }
+    try { await sb.from('messages').delete().neq('id', 0); results.push('messages cleared'); } catch (e) { results.push('clear messages: ' + e.message); }
+    try { await sb.from('investments').delete().neq('id', 0); results.push('investments cleared'); } catch (e) { results.push('clear investments: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -573,6 +584,56 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
   try {
     const result = await dbQuery('investments', '*', { user_id: parseInt(req.params.userId) }, { order: { column: 'created_at', ascending: false } });
     res.json({ investments: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== ADMIN CLEAR DATA =====================
+app.post('/api/admin/clear-transactions', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    if (isSupabase()) {
+      const { supabase } = require('../database');
+      const sb = supabase();
+      await sb.from('transactions').delete().neq('id', 0);
+    } else {
+      const { default: { mem } } = await import('../database.js');
+      mem.transactions = [];
+    }
+    res.json({ success: true, message: 'All transactions cleared' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/clear-all', requireAuth, requireAdmin, async (req, res) => {
+  const { table } = req.body;
+  const allowed = ['transactions', 'withdrawals', 'task_claims', 'notifications', 'messages', 'investments'];
+  if (!allowed.includes(table)) return res.status(400).json({ error: 'Invalid table. Allowed: ' + allowed.join(', ') });
+  try {
+    if (isSupabase()) {
+      const { supabase } = require('../database');
+      const sb = supabase();
+      await sb.from(table).delete().neq('id', 0);
+    } else {
+      const db = require('../database');
+      if (db.mem && db.mem[table]) db.mem[table] = [];
+    }
+    res.json({ success: true, message: `All data in ${table} cleared` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/delete-user/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (isSupabase()) {
+      const { supabase } = require('../database');
+      const sb = supabase();
+      await sb.from('notifications').delete().eq('user_id', userId);
+      await sb.from('task_claims').delete().eq('user_id', userId);
+      await sb.from('messages').delete().eq('user_id', userId);
+      await sb.from('withdrawals').delete().eq('user_id', userId);
+      await sb.from('investments').delete().eq('user_id', userId);
+      await sb.from('transactions').delete().eq('user_id', userId);
+      await sb.from('users').delete().eq('id', userId);
+    }
+    res.json({ success: true, message: 'User and all related data deleted' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

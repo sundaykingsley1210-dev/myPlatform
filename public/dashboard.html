@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Dashboard - Enrich U</title>
@@ -34,11 +35,11 @@
       <div class="dash-stats">
         <div class="dash-stat-card">
           <div class="label">Wallet Balance</div>
-          <div class="value primary" id="balanceVal">₦0</div>
+          <div class="value primary" id="balanceVal">₦0.00</div>
         </div>
         <div class="dash-stat-card">
           <div class="label">Total Earned</div>
-          <div class="value accent" id="totalEarnedVal">₦0</div>
+          <div class="value accent" id="totalEarnedVal">₦0.00</div>
         </div>
         <div class="dash-stat-card">
           <div class="label">Active Investments</div>
@@ -118,9 +119,11 @@
       } catch (err) { window.location.href = '/login.html'; }
     }
 
+    function formatAmount(n) { return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
     function updateStats() {
-      document.getElementById('balanceVal').textContent = '₦' + Number(userData.balance).toLocaleString();
-      document.getElementById('totalEarnedVal').textContent = '₦' + Number(userData.totalEarned).toLocaleString();
+      document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+      document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
       document.getElementById('activeInvestmentsVal').textContent = investments.filter(i => i.status === 'active').length;
     }
 

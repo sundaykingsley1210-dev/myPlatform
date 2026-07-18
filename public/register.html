@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Sign Up - Enrich U</title>
@@ -31,7 +32,10 @@
 
         <div class="form-group">
           <label for="password"><i class="fas fa-lock"></i> Password</label>
-          <input type="password" id="password" placeholder="Create a strong password (min 8 characters)" required minlength="8" oninput="checkPasswordStrength()" autocomplete="new-password">
+          <div class="password-input-wrap">
+            <input type="password" id="password" placeholder="Create a strong password (min 8 characters)" required minlength="8" oninput="checkPasswordStrength()" autocomplete="new-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('password',this)"><i class="fas fa-eye"></i></button>
+          </div>
           <div class="password-strength">
             <div class="strength-bar">
               <div class="strength-fill" id="strengthFill"></div>
@@ -42,7 +46,10 @@
 
         <div class="form-group">
           <label for="confirmPassword"><i class="fas fa-lock"></i> Confirm Password</label>
-          <input type="password" id="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+          <div class="password-input-wrap">
+            <input type="password" id="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('confirmPassword',this)"><i class="fas fa-eye"></i></button>
+          </div>
         </div>
 
         <div class="form-group" id="referralGroup">
@@ -156,6 +163,13 @@
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
       }
+    }
+
+    function togglePass(id, btn) {
+      const inp = document.getElementById(id);
+      const icon = btn.querySelector('i');
+      if (inp.type === 'password') { inp.type = 'text'; icon.className = 'fas fa-eye-slash'; }
+      else { inp.type = 'password'; icon.className = 'fas fa-eye'; }
     }
 
     const params = new URLSearchParams(window.location.search);

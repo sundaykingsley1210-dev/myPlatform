@@ -1129,13 +1129,38 @@ body {
 .form-group input {
   width: 100%;
   padding: 12px 16px;
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-dark);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 0.95rem;
-  font-family: inherit;
+  font-size: 0.9rem;
   transition: var(--transition);
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 44px;
+}
+
+.toggle-pass {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  font-size: 1rem;
+  z-index: 2;
+}
+
+.toggle-pass:hover {
+  color: var(--primary);
 }
 
 .form-group input:focus {

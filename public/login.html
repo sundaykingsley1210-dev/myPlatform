@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="theme-color" content="#0a0e27">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Login - Enrich U</title>
@@ -31,7 +32,10 @@
 
         <div class="form-group">
           <label for="password"><i class="fas fa-lock"></i> Password</label>
-          <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+          <div class="password-input-wrap">
+            <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+            <button type="button" class="toggle-pass" onclick="togglePass('password',this)"><i class="fas fa-eye"></i></button>
+          </div>
         </div>
 
         <p style="text-align:right;margin-bottom:16px;"><a href="/forgot-password.html" style="color:var(--primary);font-size:0.85rem;">Forgot Password?</a></p>
@@ -48,18 +52,6 @@
   </div>
 
   <script>
-    async function checkExistingSession() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const res = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
-          if (res.ok) { window.location.href = '/dashboard.html'; return; }
-        } catch (e) {}
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-
     function showAlert(message, type) {
       const box = document.getElementById('alertBox');
       box.className = 'alert alert-' + type;
@@ -112,7 +104,12 @@
       }
     }
 
-    checkExistingSession();
+    function togglePass(id, btn) {
+      const inp = document.getElementById(id);
+      const icon = btn.querySelector('i');
+      if (inp.type === 'password') { inp.type = 'text'; icon.className = 'fas fa-eye-slash'; }
+      else { inp.type = 'password'; icon.className = 'fas fa-eye'; }
+    }
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch(() => {});
