@@ -492,82 +492,17 @@
 
     async function loadInstallApp() {
       const area = document.getElementById('installAppArea');
-      try {
-        const res = await API('/api/download-status');
-        const data = await res.json();
-        if (data.paid) {
-          area.innerHTML = `<div class="vip-detail-card" style="text-align:center;">
-            <div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-check"></i></div>
-            <h3 style="margin-bottom:8px;">App Unlocked!</h3>
-            <p style="color:var(--text-secondary);margin-bottom:24px;">You can now install Enrich U on your device</p>
-            <div class="install-steps">
-              <div class="install-step"><div class="install-step-num">1</div><div><strong>Android</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the browser menu (3 dots) > "Add to Home screen" or "Install App"</span></div></div>
-              <div class="install-step"><div class="install-step-num">2</div><div><strong>iPhone/iPad</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the Share button > "Add to Home Screen"</span></div></div>
-              <div class="install-step"><div class="install-step-num">3</div><div><strong>Computer</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Click the install icon in the address bar or use browser menu</span></div></div>
-            </div>
-            <button class="btn btn-primary btn-lg" onclick="installApp()" style="margin-top:20px;width:100%;max-width:400px;"><i class="fas fa-download"></i> Install Now</button>
-          </div>`;
-        } else {
-          area.innerHTML = `<div class="vip-detail-card" style="text-align:center;">
-            <div class="vip-detail-crown" style="margin:0 auto 16px;"><i class="fas fa-mobile-alt"></i></div>
-            <h3 style="margin-bottom:8px;">Download Enrich U App</h3>
-            <p style="color:var(--text-secondary);margin-bottom:8px;">Install the app on your phone or computer for quick access</p>
-            <div style="padding:16px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin:16px 0;">
-              <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Installation Fee</div>
-              <div style="font-size:2rem;font-weight:900;color:var(--primary);">₦${3500.toLocaleString()}</div>
-              <div style="font-size:0.8rem;color:var(--text-muted);">One-time payment via Monnify</div>
-            </div>
-            <button class="btn btn-primary btn-lg" onclick="startDownloadPayment()" id="downloadPayBtn" style="width:100%;max-width:400px;"><i class="fas fa-credit-card"></i> Pay to Download</button>
-            <div id="downloadPaymentDetails" style="margin-top:20px;text-align:left;"></div>
-          </div>`;
-        }
-      } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
-    }
-
-    async function startDownloadPayment() {
-      const btn = document.getElementById('downloadPayBtn');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating...';
-      try {
-        const res = await API('/api/request-download', { method: 'POST' });
-        const data = await res.json();
-        if (data.paid) { loadInstallApp(); return; }
-        if (res.ok && data.paymentDetails) {
-          const pd = data.paymentDetails;
-          document.getElementById('downloadPaymentDetails').innerHTML = `
-            <div class="payment-generated-box">
-              <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below</div>
-              <div class="payment-bank-card">
-                <div class="payment-bank-name"><i class="fas fa-university"></i> ${pd.bankName}</div>
-                <div class="payment-account-number" onclick="copyText('${pd.accountNumber}')" title="Tap to copy">${pd.accountNumber}<i class="fas fa-copy" style="margin-left:10px;font-size:0.8rem;opacity:0.6;"></i></div>
-                <div class="payment-account-name">${pd.accountName}</div>
-              </div>
-              <div class="payment-amount-box">
-                <div class="payment-amount-label">Amount to Pay</div>
-                <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
-              </div>
-              <div style="margin-top:16px;text-align:center;">
-                <button class="btn btn-accent btn-lg" onclick="verifyDownloadPayment('${pd.reference}')" id="verifyDlBtn" style="width:100%;"><i class="fas fa-check-double"></i> I've Made Payment</button>
-              </div>
-            </div>`;
-          btn.style.display = 'none';
-        } else { showToast(data.error || 'Failed', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-credit-card"></i> Pay to Download'; }
-      } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-credit-card"></i> Pay to Download'; }
-    }
-
-    async function verifyDownloadPayment(reference) {
-      const btn = document.getElementById('verifyDlBtn');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Verifying...'; }
-      try {
-        const res = await API('/api/verify-download', { method: 'POST', body: JSON.stringify({ reference }) });
-        const data = await res.json();
-        if (res.ok && data.paid) {
-          showToast('Payment verified! App unlocked.', 'success');
-          loadInstallApp();
-        } else {
-          showToast(data.error || 'Payment not confirmed yet. Please wait.', 'error');
-          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; }
-        }
-      } catch (err) { showToast('Verification failed', 'error'); if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; } }
+      area.innerHTML = `<div class="vip-detail-card" style="text-align:center;">
+        <div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-download"></i></div>
+        <h3 style="margin-bottom:8px;">Install Enrich U App</h3>
+        <p style="color:var(--text-secondary);margin-bottom:24px;">Add to your home screen for quick access — it's free!</p>
+        <div class="install-steps">
+          <div class="install-step"><div class="install-step-num">1</div><div><strong>Android</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the browser menu (3 dots) > "Add to Home screen" or "Install App"</span></div></div>
+          <div class="install-step"><div class="install-step-num">2</div><div><strong>iPhone/iPad</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the Share button > "Add to Home Screen"</span></div></div>
+          <div class="install-step"><div class="install-step-num">3</div><div><strong>Computer</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Click the install icon in the address bar or use browser menu</span></div></div>
+        </div>
+        <button class="btn btn-primary btn-lg" onclick="installApp()" style="margin-top:20px;width:100%;max-width:400px;"><i class="fas fa-download"></i> Install Now</button>
+      </div>`;
     }
 
     function logout() {
