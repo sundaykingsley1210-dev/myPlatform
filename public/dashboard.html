@@ -42,8 +42,8 @@
           <div class="value accent" id="totalEarnedVal">₦0.00</div>
         </div>
         <div class="dash-stat-card">
-          <div class="label">Active Investments</div>
-          <div class="value gold" id="activeInvestmentsVal">0</div>
+          <div class="label">My VIP Level</div>
+          <div class="value gold" id="myVipLevel">None</div>
         </div>
       </div>
 
@@ -129,7 +129,13 @@
     function updateStats() {
       document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
       document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
-      document.getElementById('activeInvestmentsVal').textContent = investments.filter(i => i.status === 'active').length;
+      const activeInvs = investments.filter(i => i.status === 'active');
+      if (activeInvs.length > 0) {
+        const highestVip = Math.max(...activeInvs.map(i => i.vipLevel));
+        document.getElementById('myVipLevel').textContent = 'VIP ' + highestVip;
+      } else {
+        document.getElementById('myVipLevel').textContent = 'None';
+      }
     }
 
     function switchTab(tab, el) {
@@ -156,16 +162,23 @@
 
     function renderVipSelect() {
       const grid = document.getElementById('vipSelectGrid');
+      const activeInvs = investments.filter(i => i.status === 'active');
+      const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
         const totalEarned = plan.dailyReturn * 730;
         const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
-        html += `<div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
+        const isCurrent = parseInt(level) === currentVip;
+        const isUpgrade = parseInt(level) > currentVip;
+        const isLower = parseInt(level) < currentVip;
+        const badge = isCurrent ? '<div style="font-size:0.6rem;background:#22c55e;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT</div>' : isUpgrade ? '<div style="font-size:0.6rem;background:var(--primary);color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">UPGRADE</div>' : '';
+        html += `<div class="vip-select-card ${isCurrent ? 'selected' : ''} ${isLower ? 'style="opacity:0.5;"' : ''}" onclick="${isLower ? '' : 'selectVip(' + level + ')'}" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
           <div class="price">₦${plan.amount.toLocaleString()}</div>
           <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
           <div class="vip-roi-badge">${roi}% ROI</div>
           <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
+          ${badge}
         </div>`;
       }
       grid.innerHTML = html;
@@ -177,13 +190,17 @@
       const plan = vipPlans[level];
       const totalEarned = plan.dailyReturn * 730;
       const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
+      const activeInvs = investments.filter(i => i.status === 'active');
+      const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
+      const isUpgrade = level > currentVip && currentVip > 0;
+      const currentAmount = isUpgrade ? (activeInvs.find(i => i.vipLevel === currentVip)?.amount || 0) : 0;
       const pa = document.getElementById('paymentArea');
       pa.style.display = 'block';
       pa.innerHTML = `<div class="vip-detail-card">
         <div class="vip-detail-header">
           <div class="vip-detail-crown"><i class="fas fa-crown"></i></div>
           <div>
-            <h3 class="vip-detail-title">VIP ${level} Investment</h3>
+            <h3 class="vip-detail-title">VIP ${level} Investment ${isUpgrade ? '(Upgrade)' : ''}</h3>
             <p class="vip-detail-subtitle">2-Year Partnership Plan</p>
           </div>
         </div>
@@ -222,6 +239,8 @@
 
         <div class="vip-detail-summary">
           <div class="vip-summary-row"><span>Investment</span><span>₦${plan.amount.toLocaleString()}</span></div>
+          ${isUpgrade ? '<div class="vip-summary-row" style="color:#22c55e;"><span>Upgrade Refund (VIP ' + currentVip + ')</span><span>+₦' + currentAmount.toLocaleString() + '</span></div>' : ''}
+          ${isUpgrade ? '<div class="vip-summary-row total"><span>Amount to Pay</span><span>₦' + (plan.amount - currentAmount).toLocaleString() + '</span></div>' : ''}
           <div class="vip-summary-row"><span>Daily Return</span><span>₦${plan.dailyReturn.toLocaleString()}</span></div>
           <div class="vip-summary-row"><span>Monthly (30 days)</span><span>₦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
           <div class="vip-summary-row"><span>Yearly (365 days)</span><span>₦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
@@ -231,7 +250,7 @@
 
         <div style="margin-top:24px;text-align:center;">
           <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn" style="width:100%;max-width:400px;">
-            <i class="fas fa-money-bill-transfer"></i> Proceed to Payment
+            <i class="fas fa-money-bill-transfer"></i> ${isUpgrade ? 'Pay ₦' + (plan.amount - currentAmount).toLocaleString() + ' to Upgrade' : 'Proceed to Payment'}
           </button>
           <button class="btn btn-outline" onclick="cancelVipSelection()" style="margin-top:10px;width:100%;max-width:400px;">
             <i class="fas fa-arrow-left"></i> Back to Plans
@@ -406,24 +425,35 @@
 
     function renderInvestments() {
       const list = document.getElementById('investmentsList');
+      const activeInvs = investments.filter(i => i.status === 'active');
+      const highestVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
+
       if (investments.length === 0) {
         list.innerHTML = `<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments Yet</h3><p>Start by choosing a VIP plan</p><br><button class="btn btn-primary" onclick="document.querySelectorAll('.dash-tab')[2].click();"><i class="fas fa-plus-circle"></i> Make First Investment</button></div>`;
         return;
       }
       let html = '';
       investments.forEach(inv => {
-        html += `<div class="investment-card">
-          <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span><span class="status-badge active">${inv.status}</span></div><span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
+        const c = inv.status === 'active' ? '#22c55e' : inv.status === 'upgraded' ? '#a855f7' : '#ef4444';
+        const upgradeBtn = inv.status === 'active' && inv.vipLevel < 9 ? `<button class="btn btn-outline btn-sm" onclick="upgradeVip(${inv.vipLevel + 1})" style="margin-top:8px;"><i class="fas fa-arrow-up"></i> Upgrade to VIP ${inv.vipLevel + 1}</button>` : '';
+        html += `<div class="investment-card" style="border-left:3px solid ${c};">
+          <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${inv.status}</span></div><span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
           <div class="investment-details">
             <div class="invest-detail"><div class="label">Invested</div><div class="val primary">₦${Number(inv.amount).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">₦${Number(inv.dailyReturn).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">Collected</div><div class="val">₦${Number(inv.totalCollected).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.daysCollected}</div></div>
           </div>
-          <div class="claim-btn-container"><button class="btn btn-accent" onclick="claimTask(${inv.id})" id="claimBtn${inv.id}"><i class="fas fa-hand-pointer"></i> Collect (₦${Number(inv.dailyReturn).toLocaleString()})</button></div>
+          ${inv.status === 'active' ? '<div class="claim-btn-container"><button class="btn btn-accent" onclick="claimTask(' + inv.id + ')" id="claimBtn' + inv.id + '"><i class="fas fa-hand-pointer"></i> Collect (₦' + Number(inv.dailyReturn).toLocaleString() + ')</button></div>' : ''}
+          ${upgradeBtn}
         </div>`;
       });
       list.innerHTML = html;
+    }
+
+    function upgradeVip(targetVip) {
+      window._upgradeVip = targetVip;
+      document.querySelectorAll('.dash-tab')[2].click();
     }
 
     async function loadTaskStatus() {

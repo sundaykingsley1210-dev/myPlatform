@@ -192,10 +192,44 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
 
     const plan = VIP_PLANS[tx.vip_level];
     const userLocation = NG_LOCATIONS[req.userId % NG_LOCATIONS.length];
+
+    // Add payment amount to wallet
+    const userRes = await dbQuery('users', 'balance, total_earned', { id: req.userId }, { single: true });
+    const newBal = userRes.data.balance + tx.amount;
+    await dbUpdate('users', { balance: newBal }, { id: req.userId });
+
+    // Check if user has existing active investment (upgrade)
+    const existingInv = await dbQuery('investments', 'id, vip_level, amount, status', { user_id: req.userId, status: 'active' });
+    let refundAmount = 0;
+    if (existingInv.data && existingInv.data.length > 0) {
+      for (const inv of existingInv.data) {
+        if (inv.vip_level < tx.vip_level) {
+          refundAmount += inv.amount;
+          await dbUpdate('investments', { status: 'upgraded' }, { id: inv.id });
+          await dbInsert('notifications', { user_id: req.userId, title: 'VIP Upgraded', message: `Your VIP ${inv.vip_level} investment has been upgraded to VIP ${tx.vip_level}. ₦${inv.amount.toLocaleString()} has been refunded to your wallet.` });
+        }
+      }
+    }
+
+    // Credit refund to wallet
+    if (refundAmount > 0) {
+      const userBal2 = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+      await dbUpdate('users', { balance: userBal2.data.balance + refundAmount }, { id: req.userId });
+    }
+
+    // Create new investment
     await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
     await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
 
-    await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: `Your VIP ${tx.vip_level} investment of ₦${tx.amount.toLocaleString()} is now active. Start collecting daily returns!` });
+    // Deduct investment amount from wallet
+    const userBal3 = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+    await dbUpdate('users', { balance: userBal3.data.balance - tx.amount }, { id: req.userId });
+
+    const msg = refundAmount > 0
+      ? `Payment verified! VIP ${tx.vip_level} activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
+      : `Payment verified! Your VIP ${tx.vip_level} investment is now active.`;
+
+    await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: msg });
 
     // Referral bonus: 10% of investment amount
     try {
@@ -204,16 +238,17 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
         const referrer = await dbQuery('users', 'id, username, balance, total_earned', { referral_code: investor.data.referred_by }, { single: true });
         if (referrer.data) {
           const bonus = Math.round(tx.amount * 0.10);
-          const newBal = referrer.data.balance + bonus;
-          const newEarned = referrer.data.total_earned + bonus;
-          await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: referrer.data.id });
+          const refNewBal = referrer.data.balance + bonus;
+          const refNewEarned = referrer.data.total_earned + bonus;
+          await dbUpdate('users', { balance: refNewBal, total_earned: refNewEarned }, { id: referrer.data.id });
           await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${reference}`, bank_name: '', account_number: '', account_name: '' });
           await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! ${req.username} just invested ₦${tx.amount.toLocaleString()} (VIP ${tx.vip_level}).` });
         }
       }
     } catch (e) { console.log('Referral bonus error:', e.message); }
 
-    res.json({ success: true, message: 'Payment verified! Your investment is now active.' });
+    const finalBal = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+    res.json({ success: true, message: msg, newBalance: finalBal.data.balance });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
