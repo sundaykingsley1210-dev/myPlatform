@@ -13,9 +13,10 @@ const mem = {
   transactions: [],
   withdrawals: [],
   task_claims: [],
-  notifications: []
+  notifications: [],
+  messages: []
 };
-let nextId = { users: 1, investments: 1, transactions: 1, withdrawals: 1, task_claims: 1, notifications: 1 };
+let nextId = { users: 1, investments: 1, transactions: 1, withdrawals: 1, task_claims: 1, notifications: 1, messages: 1 };
 
 function initDatabase() {
   if (SUPABASE_URL && SUPABASE_KEY) {

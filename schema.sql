@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS users (
   balance REAL DEFAULT 0,
   total_earned REAL DEFAULT 0,
   is_admin BOOLEAN DEFAULT FALSE,
+  referral_code TEXT DEFAULT '',
+  referred_by TEXT DEFAULT '',
+  reset_code TEXT DEFAULT '',
+  reset_expires TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -71,6 +75,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  sender TEXT NOT NULL DEFAULT 'user',
+  message TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create admin user (password: admin123)
 INSERT INTO users (username, password, email, is_admin) VALUES
   ('admin', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin@enrichu.com', true)
@@ -91,3 +103,4 @@ CREATE POLICY "Service role full access" ON transactions FOR ALL USING (true) WI
 CREATE POLICY "Service role full access" ON withdrawals FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON task_claims FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Service role full access" ON notifications FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);

@@ -45,6 +45,11 @@
           <input type="password" id="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
         </div>
 
+        <div class="form-group" id="referralGroup">
+          <label for="referralCode"><i class="fas fa-user-friends"></i> Referral Code (optional)</label>
+          <input type="text" id="referralCode" placeholder="Enter referral code" autocomplete="off">
+        </div>
+
         <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
           <i class="fas fa-user-plus"></i> Create Account
         </button>
@@ -131,7 +136,7 @@
         const res = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, password, referralCode: document.getElementById('referralCode').value.trim() })
         });
 
         const data = await res.json();
@@ -152,6 +157,10 @@
         submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
       }
     }
+
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) document.getElementById('referralCode').value = ref;
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js').catch(() => {});

@@ -17,14 +17,15 @@ const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.10');
 const monnifyConfigured = MONNIFY_API_KEY && MONNIFY_SECRET;
 
 const VIP_PLANS = {
-  1: { amount: 9000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
-  2: { amount: 27000, dailyReturn: 2700, withdrawalDay: 'Tuesday' },
-  3: { amount: 54000, dailyReturn: 6000, withdrawalDay: 'Wednesday' },
-  4: { amount: 81000, dailyReturn: 10200, withdrawalDay: 'Wednesday' },
-  5: { amount: 120000, dailyReturn: 15000, withdrawalDay: 'Thursday' },
-  6: { amount: 200000, dailyReturn: 18000, withdrawalDay: 'Thursday' },
-  7: { amount: 230000, dailyReturn: 21000, withdrawalDay: 'Friday' },
-  8: { amount: 280000, dailyReturn: 28000, withdrawalDay: 'Friday' }
+  1: { amount: 3000, dailyReturn: 250, withdrawalDay: 'Monday' },
+  2: { amount: 9000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
+  3: { amount: 27000, dailyReturn: 2700, withdrawalDay: 'Tuesday' },
+  4: { amount: 54000, dailyReturn: 6000, withdrawalDay: 'Wednesday' },
+  5: { amount: 81000, dailyReturn: 10200, withdrawalDay: 'Wednesday' },
+  6: { amount: 120000, dailyReturn: 15000, withdrawalDay: 'Thursday' },
+  7: { amount: 200000, dailyReturn: 18000, withdrawalDay: 'Thursday' },
+  8: { amount: 230000, dailyReturn: 21000, withdrawalDay: 'Friday' },
+  9: { amount: 280000, dailyReturn: 28000, withdrawalDay: 'Friday' }
 };
 
 app.use(express.json());
@@ -78,7 +79,9 @@ app.post('/api/register', async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const result = await dbInsert('users', { username, password: hashedPassword });
+    const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+    const referredBy = req.body.referralCode || null;
+    const result = await dbInsert('users', { username, password: hashedPassword, referral_code: refCode, referred_by: referredBy });
 
     if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });
 
@@ -411,6 +414,149 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS vat_amount REAL DEFAULT 0' }); results.push('withdrawals.vat_amount added'); } catch (e) { results.push('withdrawals.vat_amount: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS credit_amount REAL DEFAULT 0' }); results.push('withdrawals.credit_amount added'); } catch (e) { results.push('withdrawals.credit_amount: ' + e.message); }
     res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== PROFILE SETTINGS =====================
+app.get('/api/profile', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('users', 'id, username, email, phone, full_name, balance, total_earned, referral_code, created_at', { id: req.userId }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'User not found' });
+    const u = result.data;
+    res.json({ user: { id: u.id, username: u.username, email: u.email, phone: u.phone, fullName: u.full_name, balance: u.balance, totalEarned: u.total_earned, referralCode: u.referral_code, createdAt: u.created_at } });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/profile', requireAuth, async (req, res) => {
+  const { email, phone, fullName } = req.body;
+  try {
+    await dbUpdate('users', { email: email || '', phone: phone || '', full_name: fullName || '' }, { id: req.userId });
+    res.json({ success: true, message: 'Profile updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/change-password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'All fields required' });
+  if (newPassword.length < 8) return res.status(400).json({ error: 'New password must be at least 8 characters' });
+  try {
+    const result = await dbQuery('users', 'password', { id: req.userId }, { single: true });
+    const valid = await bcrypt.compare(currentPassword, result.data.password);
+    if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await dbUpdate('users', { password: hashed }, { id: req.userId });
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== FORGOT PASSWORD =====================
+app.post('/api/forgot-password', async (req, res) => {
+  const { username, email } = req.body;
+  if (!username || !email) return res.status(400).json({ error: 'Username and email required' });
+  try {
+    const result = await dbQuery('users', 'id, username, email', { username, email }, { single: true });
+    if (!result.data) return res.status(400).json({ error: 'No account found with these details' });
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date(Date.now() + 15 * 60 * 1000);
+    await dbUpdate('users', { reset_code: code, reset_expires: expires.toISOString() }, { id: result.data.id });
+    try {
+      const transporter = require('nodemailer').createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: false,
+        auth: { user: process.env.SMTP_USER || '', pass: process.env.SMTP_PASS || '' }
+      });
+      if (process.env.SMTP_USER) {
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || 'Enrich U <noreply@enrichu.com>',
+          to: email,
+          subject: 'Password Reset Code - Enrich U',
+          html: `<div style="font-family:Arial,sans-serif;max-width:400px;margin:0 auto;padding:20px;"><h2 style="color:#0057ff;">Password Reset</h2><p>Hi ${result.data.username},</p><p>Your password reset code is:</p><div style="text-align:center;padding:20px;background:#f5f5f5;border-radius:8px;margin:20px 0;"><span style="font-size:32px;font-weight:900;color:#0057ff;letter-spacing:5px;">${code}</span></div><p style="color:#666;font-size:0.85rem;">This code expires in 15 minutes. If you didn't request this, ignore this email.</p></div>`
+        });
+        res.json({ success: true, message: 'Reset code sent to your email' });
+      } else {
+        res.json({ success: true, message: 'Reset code generated. Email not configured — contact support.', code });
+      }
+    } catch (e) {
+      res.json({ success: true, message: 'Reset code generated. Email not configured — contact support.', code });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/reset-password', async (req, res) => {
+  const { username, code, newPassword } = req.body;
+  if (!username || !code || !newPassword) return res.status(400).json({ error: 'All fields required' });
+  if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  try {
+    const result = await dbQuery('users', 'id, reset_code, reset_expires', { username }, { single: true });
+    if (!result.data || result.data.reset_code !== code) return res.status(400).json({ error: 'Invalid reset code' });
+    if (new Date(result.data.reset_expires) < new Date()) return res.status(400).json({ error: 'Reset code has expired' });
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await dbUpdate('users', { password: hashed, reset_code: null, reset_expires: null }, { id: result.data.id });
+    res.json({ success: true, message: 'Password reset successful. You can now login.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== REFERRAL SYSTEM =====================
+function generateReferralCode() {
+  return 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+}
+
+app.get('/api/referral', requireAuth, async (req, res) => {
+  try {
+    const user = await dbQuery('users', 'referral_code', { id: req.userId }, { single: true });
+    if (!user.data.referral_code) {
+      const code = generateReferralCode();
+      await dbUpdate('users', { referral_code: code }, { id: req.userId });
+      return res.json({ referralCode: code, referralCount: 0, referralEarnings: 0 });
+    }
+    const referrals = await dbQuery('users', 'id, username, created_at', { referred_by: user.data.referral_code });
+    const count = referrals.data?.length || 0;
+    const earnings = await dbQuery('transactions', 'amount', { user_id: req.userId, type: 'referral_bonus' });
+    const totalEarnings = earnings.data?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+    res.json({ referralCode: user.data.referral_code, referralCount: count, referralEarnings: totalEarnings, referrals: referrals.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== CHAT / SUPPORT =====================
+app.get('/api/messages', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('messages', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: true } });
+    res.json({ messages: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/messages', requireAuth, async (req, res) => {
+  const { message } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
+  try {
+    await dbInsert('messages', { user_id: req.userId, sender: 'user', message: message.trim() });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('messages', '*', {}, { order: { column: 'created_at', ascending: true } });
+    res.json({ messages: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, message } = req.body;
+  if (!userId || !message) return res.status(400).json({ error: 'userId and message required' });
+  try {
+    await dbInsert('messages', { user_id: userId, sender: 'admin', message: message.trim() });
+    await dbInsert('notifications', { user_id: userId, title: 'Support Reply', message: 'Admin replied to your message. Check your chat.' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== ADMIN USER INVESTMENTS =====================
+app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('investments', '*', { user_id: parseInt(req.params.userId) }, { order: { column: 'created_at', ascending: false } });
+    res.json({ investments: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

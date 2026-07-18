@@ -53,6 +53,9 @@
         <button class="dash-tab" onclick="switchTab('withdraw',this)"><i class="fas fa-money-bill-wave"></i> Withdraw</button>
         <button class="dash-tab" onclick="switchTab('history',this)"><i class="fas fa-history"></i> History</button>
         <button class="dash-tab" onclick="switchTab('install',this)"><i class="fas fa-download"></i> Install App</button>
+        <button class="dash-tab" onclick="switchTab('referral',this)"><i class="fas fa-users"></i> Referral</button>
+        <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
+        <button class="dash-tab" onclick="switchTab('profile',this)"><i class="fas fa-user-circle"></i> Profile</button>
         <button class="dash-tab" onclick="switchTab('notifications',this)"><i class="fas fa-bell"></i> Alerts <span id="notifBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
       </div>
 
@@ -74,6 +77,9 @@
       </div>
       <div class="dash-panel" id="panel-history"><div id="historyList"></div></div>
       <div class="dash-panel" id="panel-install"><div id="installAppArea"></div></div>
+      <div class="dash-panel" id="panel-referral"><div id="referralArea"></div></div>
+      <div class="dash-panel" id="panel-support"><div id="supportArea"></div></div>
+      <div class="dash-panel" id="panel-profile"><div id="profileArea"></div></div>
       <div class="dash-panel" id="panel-notifications"><div id="notifList"></div></div>
     </div>
   </div>
@@ -127,6 +133,9 @@
       if (tab === 'tasks') { loadTaskStatus(); loadInvestments(); }
       if (tab === 'history') loadHistory();
       if (tab === 'install') loadInstallApp();
+      if (tab === 'referral') loadReferral();
+      if (tab === 'support') loadSupport();
+      if (tab === 'profile') loadProfile();
       if (tab === 'notifications') loadNotifications();
     }
 
@@ -562,6 +571,143 @@
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login.html';
+    }
+
+    async function loadReferral() {
+      const area = document.getElementById('referralArea');
+      try {
+        const res = await API('/api/referral');
+        const data = await res.json();
+        const link = window.location.origin + '/register.html?ref=' + data.referralCode;
+        area.innerHTML = `<div class="vip-detail-card" style="text-align:center;">
+          <div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#a855f7,#6366f1);"><i class="fas fa-users"></i></div>
+          <h3 style="margin-bottom:8px;">Referral Program</h3>
+          <p style="color:var(--text-secondary);margin-bottom:20px;">Invite friends and earn rewards when they join</p>
+          <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:16px;">
+            <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Your Referral Code</div>
+            <div style="font-size:1.5rem;font-weight:900;color:var(--primary);letter-spacing:2px;margin:8px 0;" onclick="copyText('${data.referralCode}')" title="Tap to copy" style="cursor:pointer;">${data.referralCode}</div>
+            <button class="btn btn-outline btn-sm" onclick="copyText('${link}')"><i class="fas fa-copy"></i> Copy Referral Link</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">Total Referrals</div>
+              <div style="font-size:1.5rem;font-weight:900;color:var(--primary);">${data.referralCount}</div>
+            </div>
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">Earnings</div>
+              <div style="font-size:1.5rem;font-weight:900;color:var(--accent);">₦${Number(data.referralEarnings).toLocaleString()}</div>
+            </div>
+          </div>
+          ${data.referrals && data.referrals.length ? '<h4 style="text-align:left;margin-bottom:12px;">Your Referrals</h4>' + data.referrals.map(r => '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;"><span>' + r.username + '</span><span style="color:var(--text-muted);font-size:0.8rem;">' + new Date(r.created_at).toLocaleDateString() + '</span></div>').join('') : ''}
+        </div>`;
+      } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    async function loadSupport() {
+      const area = document.getElementById('supportArea');
+      area.innerHTML = `<div class="vip-detail-card">
+        <h3 style="margin-bottom:16px;"><i class="fas fa-headset" style="color:var(--primary);margin-right:8px;"></i> Support Chat</h3>
+        <div id="chatMessages" style="max-height:400px;overflow-y:auto;padding:12px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:16px;min-height:200px;"></div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="chatInput" placeholder="Type your message..." style="flex:1;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.9rem;" onkeypress="if(event.key==='Enter')sendChat()">
+          <button class="btn btn-primary" onclick="sendChat()"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>`;
+      loadChatMessages();
+    }
+
+    async function loadChatMessages() {
+      try {
+        const res = await API('/api/messages');
+        const data = await res.json();
+        const box = document.getElementById('chatMessages');
+        if (!box) return;
+        if (!data.messages || !data.messages.length) { box.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No messages yet. Send a message to start chatting with support.</p>'; return; }
+        box.innerHTML = data.messages.map(m => '<div style="margin-bottom:12px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div style="display:inline-block;padding:10px 14px;border-radius:12px;max-width:80%;background:' + (m.sender === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.05)') + ';color:' + (m.sender === 'user' ? 'white' : 'var(--text-primary)') + ';font-size:0.85rem;">' + m.message + '</div><div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">' + new Date(m.created_at).toLocaleString() + '</div></div>').join('');
+        box.scrollTop = box.scrollHeight;
+      } catch (err) {}
+    }
+
+    async function sendChat() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      try {
+        await API('/api/messages', { method: 'POST', body: JSON.stringify({ message: msg }) });
+        loadChatMessages();
+      } catch (err) { showToast('Failed to send', 'error'); }
+    }
+
+    async function loadProfile() {
+      const area = document.getElementById('profileArea');
+      try {
+        const res = await API('/api/profile');
+        const data = await res.json();
+        const u = data.user;
+        area.innerHTML = `<div class="vip-detail-card">
+          <h3 style="margin-bottom:20px;"><i class="fas fa-user-circle" style="color:var(--primary);margin-right:8px;"></i> My Profile</h3>
+          <div style="display:grid;gap:16px;">
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Username</div>
+              <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">${u.username}</div>
+            </div>
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Wallet Balance</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--primary);margin-top:4px;">₦${Number(u.balance).toLocaleString()}</div>
+            </div>
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Total Earned</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--accent);margin-top:4px;">₦${Number(u.totalEarned).toLocaleString()}</div>
+            </div>
+            <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
+              <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Member Since</div>
+              <div style="font-size:0.9rem;margin-top:4px;">${new Date(u.createdAt).toLocaleDateString()}</div>
+            </div>
+          </div>
+          <h4 style="margin:24px 0 16px;">Update Info</h4>
+          <div class="form-group"><label>Full Name</label><input type="text" id="profileName" value="${u.fullName || ''}" placeholder="Your full name"></div>
+          <div class="form-group"><label>Email</label><input type="email" id="profileEmail" value="${u.email || ''}" placeholder="your@email.com"></div>
+          <div class="form-group"><label>Phone</label><input type="tel" id="profilePhone" value="${u.phone || ''}" placeholder="Phone number"></div>
+          <button class="btn btn-primary" onclick="updateProfile()" id="profileBtn"><i class="fas fa-save"></i> Save Changes</button>
+          <h4 style="margin:24px 0 16px;">Change Password</h4>
+          <div class="form-group"><label>Current Password</label><input type="password" id="currentPass" placeholder="Enter current password"></div>
+          <div class="form-group"><label>New Password</label><input type="password" id="newPass" placeholder="Min 8 characters"></div>
+          <button class="btn btn-accent" onclick="changePassword()" id="passBtn"><i class="fas fa-lock"></i> Change Password</button>
+        </div>`;
+      } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    async function updateProfile() {
+      const btn = document.getElementById('profileBtn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving...';
+      try {
+        const res = await API('/api/profile', { method: 'PUT', body: JSON.stringify({
+          fullName: document.getElementById('profileName').value,
+          email: document.getElementById('profileEmail').value,
+          phone: document.getElementById('profilePhone').value
+        })});
+        const data = await res.json();
+        if (res.ok) showToast('Profile updated', 'success');
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    }
+
+    async function changePassword() {
+      const btn = document.getElementById('passBtn');
+      const current = document.getElementById('currentPass').value;
+      const newP = document.getElementById('newPass').value;
+      if (!current || !newP) return showToast('Fill all fields', 'error');
+      if (newP.length < 8) return showToast('Min 8 characters', 'error');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Changing...';
+      try {
+        const res = await API('/api/change-password', { method: 'POST', body: JSON.stringify({ currentPassword: current, newPassword: newP })});
+        const data = await res.json();
+        if (res.ok) { showToast('Password changed', 'success'); document.getElementById('currentPass').value = ''; document.getElementById('newPass').value = ''; }
+        else showToast(data.error, 'error');
+      } catch (err) { showToast('Failed', 'error'); }
+      btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Change Password';
     }
 
     init();
