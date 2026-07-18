@@ -448,13 +448,14 @@ app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (r
 // ===================== SETUP ADMIN =====================
 app.get('/api/setup-admin', async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id', { username: 'admin' }, { single: true });
+    const result = await dbQuery('users', 'id, is_admin', { username: 'admin' }, { single: true });
     if (result.data) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      await dbUpdate('users', { is_admin: true, password: hashedPassword }, { username: 'admin' });
-      res.json({ success: true, message: 'Admin user reset: username=admin, password=admin123' });
+      if (!result.data.is_admin) {
+        await dbUpdate('users', { is_admin: true }, { username: 'admin' });
+      }
+      res.json({ success: true, message: 'Admin account is ready. Username: admin' });
     } else {
-      res.json({ success: false, message: 'No admin user found' });
+      res.json({ success: false, message: 'No admin user found. Register first.' });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -542,8 +543,14 @@ app.get('/api/profile', requireAuth, async (req, res) => {
 
 app.put('/api/profile', requireAuth, async (req, res) => {
   const { email, phone, fullName, nickname, avatarUrl } = req.body;
+  const allowedFields = {};
+  if (email !== undefined) allowedFields.email = email;
+  if (phone !== undefined) allowedFields.phone = phone;
+  if (fullName !== undefined) allowedFields.full_name = fullName;
+  if (nickname !== undefined) allowedFields.nickname = nickname;
+  if (avatarUrl !== undefined) allowedFields.avatar_url = avatarUrl;
   try {
-    await dbUpdate('users', { email: email || '', phone: phone || '', full_name: fullName || '', nickname: nickname || '', avatar_url: avatarUrl || '' }, { id: req.userId });
+    await dbUpdate('users', allowedFields, { id: req.userId });
     res.json({ success: true, message: 'Profile updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
