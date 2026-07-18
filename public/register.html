@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up - Enrich U</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card">
+      <a href="/" class="logo">
+        <i class="fas fa-gem"></i> Enrich <span>U</span>
+      </a>
+      <h2>Create Your Account</h2>
+      <p class="subtitle">Join Enrich U and start growing your wealth today</p>
+
+      <div id="alertBox" class="alert" style="display:none;"></div>
+
+      <form id="registerForm" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="username"><i class="fas fa-user"></i> Username</label>
+          <input type="text" id="username" placeholder="Choose a username (min 3 characters)" required minlength="3" autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="password"><i class="fas fa-lock"></i> Password</label>
+          <input type="password" id="password" placeholder="Create a strong password (min 8 characters)" required minlength="8" oninput="checkPasswordStrength()" autocomplete="new-password">
+          <div class="password-strength">
+            <div class="strength-bar">
+              <div class="strength-fill" id="strengthFill"></div>
+            </div>
+            <span class="strength-text" id="strengthText"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword"><i class="fas fa-lock"></i> Confirm Password</label>
+          <input type="password" id="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" id="submitBtn">
+          <i class="fas fa-user-plus"></i> Create Account
+        </button>
+      </form>
+
+      <p class="auth-link">
+        Already have an account? <a href="/login.html">Login here</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function checkPasswordStrength() {
+      const password = document.getElementById('password').value;
+      const fill = document.getElementById('strengthFill');
+      const text = document.getElementById('strengthText');
+
+      fill.className = 'strength-fill';
+      text.className = 'strength-text';
+
+      if (password.length === 0) {
+        text.textContent = '';
+        return;
+      }
+
+      let score = 0;
+      if (password.length >= 8) score++;
+      if (password.length >= 12) score++;
+      if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+      if (/[0-9]/.test(password)) score++;
+      if (/[^A-Za-z0-9]/.test(password)) score++;
+
+      if (score <= 2) {
+        fill.classList.add('weak');
+        text.classList.add('weak');
+        text.textContent = 'Weak';
+      } else if (score <= 3) {
+        fill.classList.add('medium');
+        text.classList.add('medium');
+        text.textContent = 'Medium';
+      } else {
+        fill.classList.add('strong');
+        text.classList.add('strong');
+        text.textContent = 'Strong';
+      }
+    }
+
+    function showAlert(message, type) {
+      const box = document.getElementById('alertBox');
+      box.className = 'alert alert-' + type;
+      box.innerHTML = '<i class="fas fa-' + (type === 'error' ? 'exclamation-circle' : 'check-circle') + '"></i> ' + message;
+      box.style.display = 'flex';
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const submitBtn = document.getElementById('submitBtn');
+
+      document.getElementById('alertBox').style.display = 'none';
+
+      if (username.length < 3) {
+        showAlert('Username must be at least 3 characters', 'error');
+        return;
+      }
+
+      if (password.length < 8) {
+        showAlert('Password must be at least 8 characters', 'error');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        showAlert('Passwords do not match', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Creating Account...';
+
+      try {
+        const res = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showAlert(data.message, 'success');
+          setTimeout(() => {
+            window.location.href = '/dashboard.html';
+          }, 1000);
+        } else {
+          showAlert(data.error, 'error');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+        }
+      } catch (err) {
+        showAlert('Network error. Please try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+      }
+    }
+  </script>
+</body>
+</html>
