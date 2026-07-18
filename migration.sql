@@ -1,2 +1,4 @@
--- Run this in Supabase SQL Editor to add vip_level to transactions
+-- Run this in Supabase SQL Editor
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0;
+ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS vat_amount REAL DEFAULT 0;
+ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS credit_amount REAL DEFAULT 0;
