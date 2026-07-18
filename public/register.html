@@ -31,6 +31,16 @@
         </div>
 
         <div class="form-group">
+          <label for="email"><i class="fas fa-envelope"></i> Gmail Address <span style="color:var(--text-muted);font-weight:400;">(for password recovery)</span></label>
+          <input type="email" id="email" placeholder="yourname@gmail.com" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+          <label for="phone"><i class="fas fa-phone"></i> Phone Number <span style="color:var(--text-muted);font-weight:400;">(optional)</span></label>
+          <input type="tel" id="phone" placeholder="08012345678" autocomplete="tel">
+        </div>
+
+        <div class="form-group">
           <label for="password"><i class="fas fa-lock"></i> Password</label>
           <div class="password-input-wrap">
             <input type="password" id="password" placeholder="Create a password (min 6 characters)" required minlength="6" oninput="checkPasswordStrength()" autocomplete="new-password">
@@ -118,6 +128,8 @@
       e.preventDefault();
 
       const username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const phone = document.getElementById('phone').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
       const submitBtn = document.getElementById('submitBtn');
@@ -126,6 +138,16 @@
 
       if (username.length < 3) {
         showAlert('Username must be at least 3 characters', 'error');
+        return;
+      }
+
+      if (!email) {
+        showAlert('Gmail address is required for password recovery', 'error');
+        return;
+      }
+
+      if (!email.includes('@gmail.com') && !email.includes('@')) {
+        showAlert('Please enter a valid Gmail address', 'error');
         return;
       }
 
@@ -146,7 +168,7 @@
         const res = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password, referralCode: document.getElementById('referralCode').value.trim() })
+          body: JSON.stringify({ username, email, phone, password, referralCode: document.getElementById('referralCode').value.trim() })
         });
 
         const data = await res.json();

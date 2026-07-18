@@ -67,8 +67,9 @@ function requireAdmin(req, res, next) {
 
 // ===================== AUTH ROUTES =====================
 app.post('/api/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email, phone } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
+  if (!email) return res.status(400).json({ error: 'Gmail address is required for password recovery' });
   if (username.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
   if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
@@ -78,10 +79,17 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ error: 'Account already exists! Please login instead.' });
     }
 
+    if (email) {
+      const existingEmail = await dbQuery('users', 'id', { email });
+      if (existingEmail.data && existingEmail.data.length > 0) {
+        return res.status(400).json({ error: 'This email is already registered. Please login instead.' });
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const referredBy = req.body.referralCode || null;
-    const result = await dbInsert('users', { username, password: hashedPassword, referral_code: refCode, referred_by: referredBy });
+    const result = await dbInsert('users', { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
 
     if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });
 
@@ -483,17 +491,12 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
 
 // ===================== FORGOT PASSWORD =====================
 app.post('/api/forgot-password', async (req, res) => {
-  const { username, email } = req.body;
+  const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email address is required' });
   try {
-    let user = null;
     const emailResult = await dbQuery('users', 'id, username, email', { email }, { single: true });
-    if (emailResult.data) { user = emailResult.data; }
-    else if (username) {
-      const usernameResult = await dbQuery('users', 'id, username, email', { username }, { single: true });
-      if (usernameResult.data) user = usernameResult.data;
-    }
-    if (!user) return res.status(400).json({ error: 'No account found with this email address' });
+    if (!emailResult.data) return res.status(400).json({ error: 'No account found with this email address' });
+    const user = emailResult.data;
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = new Date(Date.now() + 15 * 60 * 1000);
     await dbUpdate('users', { reset_code: code, reset_expires: expires.toISOString() }, { id: user.id });
@@ -522,11 +525,11 @@ app.post('/api/forgot-password', async (req, res) => {
 });
 
 app.post('/api/reset-password', async (req, res) => {
-  const { username, code, newPassword } = req.body;
-  if (!username || !code || !newPassword) return res.status(400).json({ error: 'All fields required' });
+  const { email, code, newPassword } = req.body;
+  if (!email || !code || !newPassword) return res.status(400).json({ error: 'All fields required' });
   if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be 6 digits' });
   try {
-    const result = await dbQuery('users', 'id, reset_code, reset_expires', { username }, { single: true });
+    const result = await dbQuery('users', 'id, reset_code, reset_expires', { email }, { single: true });
     if (!result.data || result.data.reset_code !== code) return res.status(400).json({ error: 'Invalid verification code' });
     if (new Date(result.data.reset_expires) < new Date()) return res.status(400).json({ error: 'Verification code has expired. Request a new one.' });
     const hashed = await bcrypt.hash(newPassword, 10);
