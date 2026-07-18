@@ -6,27 +6,14 @@
       "use": "@vercel/node"
     }
   ],
-  "outputDirectory": "public",
   "routes": [
     {
       "src": "/api/(.*)",
       "dest": "api/index.js"
     },
     {
-      "src": "/(manifest\\.json|service-worker\\.js|icons/.*)",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/(.*\\.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|eot))",
-      "dest": "/public/$1"
-    },
-    {
-      "src": "/(dashboard|admin|login|register|index)(\\.html)?",
-      "dest": "/api/index.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/api/index.js"
+      "dest": "api/index.js"
     }
   ]
 }
