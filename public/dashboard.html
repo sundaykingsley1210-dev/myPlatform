@@ -232,8 +232,8 @@
     }
 
     let autoVerifyInterval = null;
-    let autoVerifyAttempts = 0;
-    const MAX_AUTO_VERIFY = 30;
+    let countdownInterval = null;
+    let paymentExpiresAt = null;
 
     async function createInvestment(level) {
       const btn = document.getElementById('investBtn');
@@ -243,6 +243,7 @@
         const data = await res.json();
         if (res.ok) {
           const pd = data.paymentDetails;
+          paymentExpiresAt = Date.now() + (20 * 60 * 1000);
           document.getElementById('generatedPayment').innerHTML = `
             <div class="payment-generated-box">
               <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below to this account</div>
@@ -256,20 +257,28 @@
                 <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
               </div>
               <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.75rem;word-break:break-all;">${pd.reference}</span></div>
-              <div class="payment-timer" id="paymentTimer">
-                <i class="fas fa-hourglass-half"></i> Auto-checking payment status...
+              <div class="payment-countdown" id="paymentCountdown">
+                <div class="countdown-header"><i class="fas fa-hourglass-half"></i> Time Remaining</div>
+                <div class="countdown-display" id="countdownDisplay">20:00</div>
                 <div class="payment-timer-bar"><div class="payment-timer-fill" id="timerFill"></div></div>
+                <div class="countdown-warn">Session expires in 20 minutes. Generate new details if expired.</div>
+              </div>
+              <div id="expiredMsg" style="display:none;padding:16px;background:rgba(239,68,68,0.08);border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.2);text-align:center;margin-top:12px;">
+                <i class="fas fa-exclamation-triangle" style="color:#ef4444;font-size:1.5rem;"></i>
+                <p style="font-weight:700;color:#ef4444;margin:8px 0;">Payment Session Expired</p>
+                <p style="font-size:0.85rem;color:var(--text-secondary);">The 20-minute window has passed. Generate new payment details to continue.</p>
               </div>
               <div style="margin-top:16px;text-align:center;display:flex;flex-direction:column;gap:10px;">
                 <button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')" id="verifyBtn" style="width:100%;">
                   <i class="fas fa-check-double"></i> I've Made Payment
                 </button>
-                <button class="btn btn-outline" onclick="cancelInvestment('${pd.reference}')" style="width:100%;">
+                <button class="btn btn-outline" onclick="cancelInvestment()" id="cancelPayBtn" style="width:100%;">
                   <i class="fas fa-times"></i> Cancel
                 </button>
               </div>
             </div>`;
           btn.style.display = 'none';
+          startCountdown();
           startAutoVerify(pd.reference);
         } else {
           showToast(data.error, 'error');
@@ -283,17 +292,37 @@
       }
     }
 
+    function startCountdown() {
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {
+        const remaining = paymentExpiresAt - Date.now();
+        if (remaining <= 0) {
+          clearInterval(countdownInterval);
+          if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+          const display = document.getElementById('countdownDisplay');
+          const expired = document.getElementById('expiredMsg');
+          const verifyBtn = document.getElementById('verifyBtn');
+          if (display) display.textContent = '00:00';
+          if (expired) expired.style.display = 'block';
+          if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.innerHTML = '<i class="fas fa-ban"></i> Session Expired'; }
+          const fill = document.getElementById('timerFill');
+          if (fill) fill.style.width = '100%';
+          return;
+        }
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        const display = document.getElementById('countdownDisplay');
+        if (display) display.textContent = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        const fill = document.getElementById('timerFill');
+        if (fill) fill.style.width = ((20 * 60 * 1000 - remaining) / (20 * 60 * 1000) * 100) + '%';
+      }, 1000);
+    }
+
     function startAutoVerify(reference) {
-      autoVerifyAttempts = 0;
       if (autoVerifyInterval) clearInterval(autoVerifyInterval);
       autoVerifyInterval = setInterval(async () => {
-        autoVerifyAttempts++;
-        const fill = document.getElementById('timerFill');
-        if (fill) fill.style.width = ((autoVerifyAttempts / MAX_AUTO_VERIFY) * 100) + '%';
-        if (autoVerifyAttempts >= MAX_AUTO_VERIFY) {
+        if (paymentExpiresAt && Date.now() >= paymentExpiresAt) {
           clearInterval(autoVerifyInterval);
-          const timer = document.getElementById('paymentTimer');
-          if (timer) timer.innerHTML = '<i class="fas fa-info-circle"></i> Auto-check stopped. Click "I\'ve Made Payment" when ready.';
           return;
         }
         try {
@@ -301,6 +330,7 @@
           const data = await res.json();
           if (res.ok && data.message !== 'Transaction not found') {
             clearInterval(autoVerifyInterval);
+            clearInterval(countdownInterval);
             showToast('Payment verified! Investment activated.', 'success');
             loadInvestments();
             loadUserData();
@@ -308,6 +338,14 @@
           }
         } catch (e) {}
       }, 10000);
+    }
+
+    function cancelInvestment() {
+      if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+      if (countdownInterval) clearInterval(countdownInterval);
+      paymentExpiresAt = null;
+      document.getElementById('paymentArea').style.display = 'none';
+      document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
     }
 
     async function verifyPayment(reference) {
@@ -318,6 +356,7 @@
         const data = await res.json();
         if (res.ok) {
           if (autoVerifyInterval) clearInterval(autoVerifyInterval);
+          if (countdownInterval) clearInterval(countdownInterval);
           showToast(data.message, 'success');
           loadInvestments();
           loadUserData();
@@ -334,12 +373,6 @@
 
     function copyText(text) {
       navigator.clipboard.writeText(text).then(() => showToast('Copied!', 'success')).catch(() => {});
-    }
-
-    async function cancelInvestment(reference) {
-      if (autoVerifyInterval) clearInterval(autoVerifyInterval);
-      document.getElementById('paymentArea').style.display = 'none';
-      document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
     }
 
     async function loadUserData() {
