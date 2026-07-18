@@ -117,28 +117,36 @@
         }
         document.getElementById('dashTitle').textContent = 'Welcome back, ' + displayName + '!';
         if (userData.isAdmin) document.getElementById('adminLink').style.display = '';
-        updateStats();
+        document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+        document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
         loadVipPlans();
         loadInvestments();
         loadTaskStatus();
         loadWithdrawInfo();
         loadNotifications();
-        setInterval(loadTaskStatus, 60000);
-        setInterval(refreshWallet, 10000);
-        document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshWallet(); });
-        window.addEventListener('focus', refreshWallet);
+        setInterval(function() {
+          API('/api/me').then(r => r.json()).then(d => {
+            userData.balance = d.user.balance;
+            userData.totalEarned = d.user.totalEarned;
+            document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+            document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+            const activeInvs = investments.filter(i => i.status === 'active');
+            if (activeInvs.length > 0) {
+              document.getElementById('myVipLevel').textContent = 'VIP ' + Math.max(...activeInvs.map(i => i.vipLevel));
+            }
+          }).catch(() => {});
+        }, 10000);
+        document.addEventListener('visibilitychange', function() {
+          if (!document.hidden) {
+            API('/api/me').then(r => r.json()).then(d => {
+              userData.balance = d.user.balance;
+              userData.totalEarned = d.user.totalEarned;
+              document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+              document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+            }).catch(() => {});
+          }
+        });
       } catch (err) { window.location.href = '/login.html'; }
-    }
-
-    async function refreshWallet() {
-      try {
-        const res = await API('/api/me');
-        if (!res.ok) return;
-        const data = await res.json();
-        userData.balance = data.user.balance;
-        userData.totalEarned = data.user.totalEarned;
-        updateStats();
-      } catch (e) {}
     }
 
     function formatAmount(n) { return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
