@@ -232,6 +232,15 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
   if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
 
   try {
+    const invRes = await dbQuery('investments', 'vip_level', { user_id: req.userId, status: 'active' });
+    const activeInvs = invRes.data || [];
+    const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vip_level || i.vipLevel || 0)) : 0;
+
+    if (currentVip === 0 && vipLevel !== 1) return res.status(400).json({ error: 'First investment must be VIP 1' });
+    if (currentVip > 0 && vipLevel !== currentVip + 1) return res.status(400).json({ error: `Can only upgrade from VIP ${currentVip} to VIP ${currentVip + 1}` });
+    if (currentVip >= 9) return res.status(400).json({ error: 'Already at maximum VIP level' });
+
+  try {
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 

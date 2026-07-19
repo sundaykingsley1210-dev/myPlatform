@@ -199,15 +199,19 @@
       const grid = document.getElementById('vipSelectGrid');
       const activeInvs = investments.filter(i => i.status === 'active');
       const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
+      const nextVip = currentVip + 1;
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
+        const l = parseInt(level);
         const totalEarned = plan.dailyReturn * 730;
         const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
-        const isCurrent = parseInt(level) === currentVip;
-        const isUpgrade = parseInt(level) > currentVip;
-        const isLower = parseInt(level) < currentVip;
-        const badge = isCurrent ? '<div style="font-size:0.6rem;background:#22c55e;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT</div>' : isUpgrade ? '<div style="font-size:0.6rem;background:var(--primary);color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">UPGRADE</div>' : '';
-        html += `<div class="vip-select-card ${isCurrent ? 'selected' : ''} ${isLower ? 'style="opacity:0.5;"' : ''}" onclick="${isLower ? '' : 'selectVip(' + level + ')'}" id="vipCard${level}">
+        const isCurrent = l === currentVip;
+        const isNext = l === nextVip && currentVip < 9;
+        const isHigher = l > nextVip;
+        const isLower = l < currentVip;
+        const badge = isCurrent ? '<div style="font-size:0.6rem;background:#22c55e;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT</div>' : isNext ? '<div style="font-size:0.6rem;background:var(--primary);color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">UPGRADE</div>' : '';
+        const canClick = isNext || (currentVip === 0 && l === 1);
+        html += `<div class="vip-select-card ${isCurrent ? 'selected' : ''} ${isLower || isHigher ? 'style="opacity:0.4;pointer-events:none;"' : ''}" onclick="${canClick ? 'selectVip(' + level + ')' : ''}" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
           <div class="price">₦${plan.amount.toLocaleString()}</div>
           <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
