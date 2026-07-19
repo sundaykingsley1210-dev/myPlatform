@@ -204,17 +204,21 @@
 
     function renderVipSelect() {
       const grid = document.getElementById('vipSelectGrid');
+      const userVip = userData.vipLevel || 0;
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
         const l = parseInt(level);
         const totalEarned = plan.dailyReturn * 730;
         const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
-        html += `<div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
+        const isLowerOrEqual = userVip > 0 && l <= userVip;
+        const badge = isLowerOrEqual ? '<div style="font-size:0.6rem;background:#ef4444;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT LEVEL</div>' : '';
+        html += `<div class="vip-select-card" style="${isLowerOrEqual ? 'opacity:0.4;pointer-events:none;' : ''}" onclick="${isLowerOrEqual ? '' : 'selectVip(' + level + ')'}" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
           <div class="price">₦${plan.amount.toLocaleString()}</div>
           <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
           <div class="vip-roi-badge">${roi}% ROI</div>
           <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
+          ${badge}
         </div>`;
       }
       grid.innerHTML = html;

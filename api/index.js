@@ -232,6 +232,10 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
   if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
 
   try {
+    const userRes = await dbQuery('users', 'vip_level', { id: req.userId }, { single: true });
+    const currentVip = userRes.data ? (userRes.data.vip_level || 0) : 0;
+    if (currentVip > 0 && parseInt(vipLevel) <= currentVip) return res.status(400).json({ error: `Cannot invest in VIP ${vipLevel}. You are already VIP ${currentVip}. Choose a higher level.` });
+
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 
