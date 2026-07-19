@@ -105,11 +105,18 @@ function extractMissingColumn(errorMessage) {
 }
 
 function isTableNotFoundError(msg) {
-  return msg && (msg.includes('does not exist') || msg.includes('not found') || msg.includes('Could not find the table'));
+  if (!msg) return false;
+  if (msg.includes('Could not find the table')) return true;
+  if (msg.includes('does not exist') && !msg.includes('column')) return true;
+  if (msg.includes('not found') && !msg.includes('column')) return true;
+  return false;
 }
 
 function isColumnError(msg) {
-  return msg && msg.includes('column') && !isTableNotFoundError(msg);
+  if (!msg) return false;
+  if (msg.includes('column')) return true;
+  const col = extractMissingColumn(msg);
+  return !!col;
 }
 
 function buildQuery(table, columns, filters, options) {
