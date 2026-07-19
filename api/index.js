@@ -314,9 +314,9 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
     await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
     await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
 
-    // Deduct investment amount from wallet
+    // Update user's VIP level + deduct investment amount from wallet
     const userBal3 = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-    await dbUpdate('users', { balance: userBal3.data.balance - tx.amount }, { id: req.userId });
+    await dbUpdate('users', { balance: userBal3.data.balance - tx.amount, vip_level: tx.vip_level }, { id: req.userId });
 
     const msg = refundAmount > 0
       ? `Payment verified! VIP ${tx.vip_level} activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
