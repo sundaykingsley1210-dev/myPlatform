@@ -1309,6 +1309,11 @@ body {
   animation: valuePulse 0.6s ease;
 }
 
+.withdraw-amt-btn:hover {
+  border-color: var(--primary) !important;
+  background: rgba(0,87,255,0.05) !important;
+}
+
 @keyframes valuePulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.08); opacity: 0.8; }

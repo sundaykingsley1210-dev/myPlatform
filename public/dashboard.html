@@ -503,6 +503,9 @@
       } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-hand-pointer"></i> Collect'; }
     }
 
+    const WITHDRAW_AMOUNTS = [1800, 8000, 25000, 70000, 200000, 500000, 1200000, 3000000];
+    let selectedWithdrawAmount = 0;
+
     async function loadWithdrawInfo() {
       const infoDiv = document.getElementById('withdrawInfo');
       const formDiv = document.getElementById('withdrawForm');
@@ -522,8 +525,13 @@
         <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
 
       if (!canWithdraw) { formDiv.innerHTML = ''; return; }
+      selectedWithdrawAmount = 0;
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
-        <div class="form-group"><label>Amount</label><input type="number" id="withdrawAmount" placeholder="Enter amount" min="100" max="${userData.balance}" oninput="updateWithdrawPreview()"></div>
+        <div class="form-group"><label>Select Amount</label>
+          <div id="withdrawAmounts" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
+            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:pointer;transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
+          </div>
+        </div>
         <div id="withdrawPreview" style="padding:12px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin-bottom:16px;display:none;">
           <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;"><span style="color:var(--text-muted);">Withdrawal Amount</span><span id="previewAmount" style="font-weight:700;">₦0</span></div>
           <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;border-top:1px solid var(--border);"><span style="color:var(--text-muted);">VAT (10%)</span><span id="previewVat" style="color:#ef4444;font-weight:700;">-₦0</span></div>
@@ -535,10 +543,26 @@
         <button class="btn btn-primary btn-block btn-lg" onclick="submitWithdraw()" id="withdrawBtn"><i class="fas fa-paper-plane"></i> Submit</button></div>`;
     }
 
-    function updateWithdrawPreview() {
-      const amount = parseFloat(document.getElementById('withdrawAmount').value) || 0;
+    function selectWithdrawAmount(amount) {
+      selectedWithdrawAmount = amount;
+      const bal = userData.balance || 0;
+      if (amount > bal) {
+        showToast('Insufficient balance. Your balance is ₦' + Number(bal).toLocaleString(), 'error');
+        selectedWithdrawAmount = 0;
+        document.querySelectorAll('.withdraw-amt-btn').forEach(b => { b.style.borderColor = 'var(--border)'; b.style.background = 'var(--bg-dark)'; });
+        document.getElementById('withdrawPreview').style.display = 'none';
+        return;
+      }
+      document.querySelectorAll('.withdraw-amt-btn').forEach(b => {
+        if (parseInt(b.dataset.amount) === amount) {
+          b.style.borderColor = 'var(--primary)';
+          b.style.background = 'rgba(0,87,255,0.1)';
+        } else {
+          b.style.borderColor = 'var(--border)';
+          b.style.background = 'var(--bg-dark)';
+        }
+      });
       const preview = document.getElementById('withdrawPreview');
-      if (amount <= 0) { preview.style.display = 'none'; return; }
       preview.style.display = 'block';
       const vat = Math.round(amount * 0.10);
       const credit = amount - vat;
@@ -548,12 +572,12 @@
     }
 
     async function submitWithdraw() {
-      const amount = parseFloat(document.getElementById('withdrawAmount').value);
+      const amount = selectedWithdrawAmount;
       const bankName = document.getElementById('withdrawBank').value.trim();
       const accountNumber = document.getElementById('withdrawAccount').value.trim();
       const accountName = document.getElementById('withdrawAccountName').value.trim();
       const btn = document.getElementById('withdrawBtn');
-      if (!amount || amount < 100) return showToast('Enter valid amount', 'error');
+      if (!amount || amount <= 0) return showToast('Please select a withdrawal amount', 'error');
       if (!bankName) return showToast('Enter bank name', 'error');
       if (!accountNumber || accountNumber.length !== 10) return showToast('Enter 10-digit account number', 'error');
       if (!accountName) return showToast('Enter account name', 'error');
