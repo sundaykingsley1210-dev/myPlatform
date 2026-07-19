@@ -204,27 +204,17 @@
 
     function renderVipSelect() {
       const grid = document.getElementById('vipSelectGrid');
-      const activeInvs = investments.filter(i => i.status === 'active');
-      const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
-      const nextVip = currentVip + 1;
       let html = '';
       for (const [level, plan] of Object.entries(vipPlans)) {
         const l = parseInt(level);
         const totalEarned = plan.dailyReturn * 730;
         const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
-        const isCurrent = l === currentVip;
-        const isNext = l === nextVip && currentVip < 9;
-        const isHigher = l > nextVip;
-        const isLower = l < currentVip;
-        const badge = isCurrent ? '<div style="font-size:0.6rem;background:#22c55e;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT</div>' : isNext ? '<div style="font-size:0.6rem;background:var(--primary);color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">UPGRADE</div>' : '';
-        const canClick = isNext || (currentVip === 0 && l === 1);
-        html += `<div class="vip-select-card ${isCurrent ? 'selected' : ''} ${isLower || isHigher ? 'style="opacity:0.4;pointer-events:none;"' : ''}" onclick="${canClick ? 'selectVip(' + level + ')' : ''}" id="vipCard${level}">
+        html += `<div class="vip-select-card" onclick="selectVip(${level})" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
           <div class="price">₦${plan.amount.toLocaleString()}</div>
           <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
           <div class="vip-roi-badge">${roi}% ROI</div>
           <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
-          ${badge}
         </div>`;
       }
       grid.innerHTML = html;
@@ -236,17 +226,13 @@
       const plan = vipPlans[level];
       const totalEarned = plan.dailyReturn * 730;
       const roi = ((totalEarned / plan.amount) * 100).toFixed(0);
-      const activeInvs = investments.filter(i => i.status === 'active');
-      const currentVip = activeInvs.length > 0 ? Math.max(...activeInvs.map(i => i.vipLevel)) : 0;
-      const isUpgrade = level > currentVip && currentVip > 0;
-      const currentAmount = isUpgrade ? (activeInvs.find(i => i.vipLevel === currentVip)?.amount || 0) : 0;
       const pa = document.getElementById('paymentArea');
       pa.style.display = 'block';
       pa.innerHTML = `<div class="vip-detail-card">
         <div class="vip-detail-header">
           <div class="vip-detail-crown"><i class="fas fa-crown"></i></div>
           <div>
-            <h3 class="vip-detail-title">VIP ${level} Investment ${isUpgrade ? '(Upgrade)' : ''}</h3>
+            <h3 class="vip-detail-title">VIP ${level} Investment</h3>
             <p class="vip-detail-subtitle">2-Year Partnership Plan</p>
           </div>
         </div>
@@ -285,8 +271,6 @@
 
         <div class="vip-detail-summary">
           <div class="vip-summary-row"><span>Investment</span><span>₦${plan.amount.toLocaleString()}</span></div>
-          ${isUpgrade ? '<div class="vip-summary-row" style="color:#22c55e;"><span>Upgrade Refund (VIP ' + currentVip + ')</span><span>+₦' + currentAmount.toLocaleString() + '</span></div>' : ''}
-          ${isUpgrade ? '<div class="vip-summary-row total"><span>Amount to Pay</span><span>₦' + (plan.amount - currentAmount).toLocaleString() + '</span></div>' : ''}
           <div class="vip-summary-row"><span>Daily Return</span><span>₦${plan.dailyReturn.toLocaleString()}</span></div>
           <div class="vip-summary-row"><span>Monthly (30 days)</span><span>₦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
           <div class="vip-summary-row"><span>Yearly (365 days)</span><span>₦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
@@ -296,7 +280,7 @@
 
         <div style="margin-top:24px;text-align:center;">
           <button class="btn btn-primary btn-lg" onclick="createInvestment(${level})" id="investBtn" style="width:100%;max-width:400px;">
-            <i class="fas fa-money-bill-transfer"></i> ${isUpgrade ? 'Pay ₦' + (plan.amount - currentAmount).toLocaleString() + ' to Upgrade' : 'Proceed to Payment'}
+            <i class="fas fa-money-bill-transfer"></i> Proceed to Payment
           </button>
           <button class="btn btn-outline" onclick="cancelVipSelection()" style="margin-top:10px;width:100%;max-width:400px;">
             <i class="fas fa-arrow-left"></i> Back to Plans
