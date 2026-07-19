@@ -1000,6 +1000,17 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '..', 'public'
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'admin.html')));
 
+app.post('/api/admin/set-field', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, field, value } = req.body;
+  if (!userId || !field) return res.status(400).json({ error: 'userId and field required' });
+  const allowed = ['total_earned', 'balance', 'vip_level'];
+  if (!allowed.includes(field)) return res.status(400).json({ error: 'field not allowed' });
+  try {
+    await dbUpdate('users', { [field]: parseFloat(value) || 0 }, { id: parseInt(userId) });
+    res.json({ success: true, message: `${field} set to ${value}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== INIT =====================
 let dbInitialized = false;
 module.exports = async (req, res) => {
