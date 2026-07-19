@@ -407,16 +407,6 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
     const userRes = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
     if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
 
-    const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
-    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDay = dayNames[ng.getDay()];
-
-    const invRes = await dbQuery('investments', 'vip_level', { user_id: req.userId, status: 'active' });
-    if (!invRes.data || invRes.data.length === 0) return res.status(400).json({ error: 'No active investments' });
-
-    const allowedDays = new Set(invRes.data.map(i => VIP_PLANS[i.vip_level]?.withdrawalDay));
-    if (!allowedDays.has(currentDay)) return res.status(400).json({ error: `Not available today (${currentDay}). Your days: ${[...allowedDays].join(', ')}` });
-
     await dbUpdate('users', { balance: userRes.data.balance - amount }, { id: req.userId });
     await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
 

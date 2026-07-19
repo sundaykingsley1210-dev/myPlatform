@@ -529,27 +529,22 @@
     async function loadWithdrawInfo() {
       const infoDiv = document.getElementById('withdrawInfo');
       const formDiv = document.getElementById('withdrawForm');
-      const activeVips = investments.filter(i => i.status === 'active');
-      const allowedDays = new Set();
-      activeVips.forEach(inv => { if (vipPlans[inv.vipLevel]) allowedDays.add(vipPlans[inv.vipLevel].withdrawalDay); });
+      const bal = Number(userData.balance || 0);
 
-      if (activeVips.length === 0) { infoDiv.innerHTML = '<p style="color:var(--text-muted);text-align:center;"><i class="fas fa-info-circle"></i> You need an active investment to make withdrawals.</p>'; formDiv.innerHTML = ''; return; }
+      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>`;
+
+      if (bal <= 0) { formDiv.innerHTML = '<p style="color:var(--text-muted);text-align:center;"><i class="fas fa-info-circle"></i> No balance available for withdrawal yet.</p>'; return; }
 
       const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const currentDay = dayNames[ng.getDay()];
-      const canWithdraw = allowedDays.has(currentDay);
 
-      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${Number(userData.balance).toLocaleString()}</span></p>
-        <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Days:</strong> ${[...allowedDays].join(', ')}s</p>
-        <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
-
-      if (!canWithdraw) { formDiv.innerHTML = ''; return; }
       selectedWithdrawAmount = 0;
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
+        <p style="margin-bottom:12px;font-size:0.85rem;color:var(--text-muted);">Today: <strong>${currentDay}</strong></p>
         <div class="form-group"><label>Select Amount</label>
           <div id="withdrawAmounts" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
-            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:pointer;transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
+            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid ${a <= bal ? 'var(--border)' : 'var(--border)'};background:${a <= bal ? 'var(--bg-dark)' : 'var(--bg-dark)'};color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= bal ? 'pointer' : 'not-allowed'};opacity:${a <= bal ? '1' : '0.4'};transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
           </div>
         </div>
         <div id="withdrawPreview" style="padding:12px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin-bottom:16px;display:none;">
