@@ -89,7 +89,10 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const referredBy = req.body.referralCode || null;
-    const result = await dbInsert('users', { username, password: hashedPassword, plain_password: password, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
+    let result = await dbInsert('users', { username, password: hashedPassword, plain_password: password, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
+    if (result.error) {
+      result = await dbInsert('users', { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
+    }
 
     if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });
 
@@ -614,7 +617,11 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
     const valid = await bcrypt.compare(currentPassword, result.data.password);
     if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: req.userId });
+    const updateData = { password: hashed, plain_password: newPassword };
+    let updateResult = await dbUpdate('users', updateData, { id: req.userId });
+    if (updateResult.error) {
+      await dbUpdate('users', { password: hashed }, { id: req.userId });
+    }
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -825,7 +832,10 @@ app.post('/api/admin/reset-password/:id', requireAuth, requireAdmin, async (req,
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot reset the main admin password' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: parseInt(req.params.id) });
+    const updateResult = await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: parseInt(req.params.id) });
+    if (updateResult.error) {
+      await dbUpdate('users', { password: hashed }, { id: parseInt(req.params.id) });
+    }
     await dbInsert('notifications', { user_id: parseInt(req.params.id), title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
     res.json({ success: true, message: `Password reset for ${user.data.username}` });
   } catch (err) { res.status(500).json({ error: err.message }); }
