@@ -39,6 +39,72 @@ app.get('/manifest.json', (req, res) => res.sendFile(path.join(publicDir, 'manif
 app.get('/service-worker.js', (req, res) => res.sendFile(path.join(publicDir, 'service-worker.js')));
 app.get('/icons/:file', (req, res) => res.sendFile(path.join(publicDir, 'icons', req.params.file)));
 
+// DATABASE MIGRATION: Run once to add missing columns
+app.get('/api/migrate-db', async (req, res) => {
+  const { supabase: getSupabase } = require('../database');
+  const sb = getSupabase();
+  if (!sb) return res.json({ error: 'No Supabase client' });
+
+  const results = [];
+
+  // Step 1: Try to create exec_sql function
+  try {
+    const fnSql = `CREATE OR REPLACE FUNCTION exec_sql(query TEXT) RETURNS TEXT AS $$ BEGIN EXECUTE query; RETURN 'OK'; EXCEPTION WHEN OTHERS THEN RETURN SQLERRM; END; $$ LANGUAGE plpgsql SECURITY DEFINER;`;
+    const r = await sb.rpc('exec_sql', { query: fnSql });
+    results.push({ step: 'create exec_sql function', result: r.data });
+  } catch (e) {
+    results.push({ step: 'create exec_sql function', result: 'failed: ' + e.message + ' (you may need to run this SQL manually)' });
+  }
+
+  // Step 2: Add missing columns one by one
+  const columns = [
+    { table: 'users', col: 'balance', type: 'NUMERIC DEFAULT 0' },
+    { table: 'users', col: 'total_earned', type: 'NUMERIC DEFAULT 0' },
+    { table: 'users', col: 'vip_level', type: 'INTEGER DEFAULT 0' },
+    { table: 'users', col: 'is_admin', type: 'BOOLEAN DEFAULT false' },
+    { table: 'users', col: 'created_at', type: 'TIMESTAMPTZ DEFAULT NOW()' },
+    { table: 'users', col: 'plain_password', type: "TEXT DEFAULT ''" },
+    { table: 'users', col: 'nickname', type: "TEXT DEFAULT ''" },
+    { table: 'users', col: 'avatar_url', type: "TEXT DEFAULT ''" },
+    { table: 'reset_requests', col: 'id', type: 'SERIAL PRIMARY KEY' },
+    { table: 'reset_requests', col: 'user_id', type: 'INTEGER' },
+    { table: 'reset_requests', col: 'username', type: "TEXT DEFAULT ''" },
+    { table: 'reset_requests', col: 'email', type: "TEXT DEFAULT ''" },
+    { table: 'reset_requests', col: 'status', type: "TEXT DEFAULT 'pending'" },
+    { table: 'reset_requests', col: 'created_at', type: 'TIMESTAMPTZ DEFAULT NOW()' },
+  ];
+
+  for (const c of columns) {
+    try {
+      const sql = `ALTER TABLE ${c.table} ADD COLUMN IF NOT EXISTS ${c.col} ${c.type};`;
+      const r = await sb.rpc('exec_sql', { query: sql });
+      results.push({ table: c.table, column: c.col, result: r.data });
+    } catch (e) {
+      results.push({ table: c.table, column: c.col, result: 'error: ' + e.message });
+    }
+  }
+
+  // Step 3: Create reset_requests table if it doesn't exist
+  try {
+    const sql = `CREATE TABLE IF NOT EXISTS reset_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT DEFAULT '', email TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW());`;
+    const r = await sb.rpc('exec_sql', { query: sql });
+    results.push({ step: 'create reset_requests table', result: r.data });
+  } catch (e) {
+    results.push({ step: 'create reset_requests table', result: 'error: ' + e.message });
+  }
+
+  // Step 4: Create notifications table if missing
+  try {
+    const sql = `CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT DEFAULT '', message TEXT DEFAULT '', is_read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW());`;
+    const r = await sb.rpc('exec_sql', { query: sql });
+    results.push({ step: 'create notifications table', result: r.data });
+  } catch (e) {
+    results.push({ step: 'create notifications table', result: 'error: ' + e.message });
+  }
+
+  res.json({ success: true, results });
+});
+
 // DEBUG: Check Supabase connection and table status
 app.get('/api/debug-db', async (req, res) => {
   const { supabase: getSupabase, isSupabase } = require('../database');
@@ -54,18 +120,6 @@ app.get('/api/debug-db', async (req, res) => {
     } catch (e) {
       results[t] = { exists: false, error: e.message };
     }
-  }
-
-  // Try a raw insert to users to see the exact error
-  try {
-    const testInsert = await sb.from('users').insert({ username: '__debug_test__' }).select();
-    results._insertTest = { success: !testInsert.error, error: testInsert.error ? testInsert.error.message : null };
-    if (!testInsert.error) {
-      // Clean up
-      await sb.from('users').delete().eq('username', '__debug_test__');
-    }
-  } catch (e) {
-    results._insertTest = { success: false, error: e.message };
   }
 
   res.json({ connected: true, isSupabase: isSupabase(), results });
