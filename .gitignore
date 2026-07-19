@@ -3,3 +3,4 @@ enrichu.db
 .env
 
 .vercel
+.env*

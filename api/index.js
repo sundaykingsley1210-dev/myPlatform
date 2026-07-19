@@ -39,6 +39,38 @@ app.get('/manifest.json', (req, res) => res.sendFile(path.join(publicDir, 'manif
 app.get('/service-worker.js', (req, res) => res.sendFile(path.join(publicDir, 'service-worker.js')));
 app.get('/icons/:file', (req, res) => res.sendFile(path.join(publicDir, 'icons', req.params.file)));
 
+// DEBUG: Check Supabase connection and table status
+app.get('/api/debug-db', async (req, res) => {
+  const { supabase: getSupabase, isSupabase } = require('../database');
+  const sb = getSupabase();
+  if (!sb) return res.json({ connected: false, error: 'No Supabase client' });
+
+  const results = {};
+  const tables = ['users', 'investments', 'transactions', 'withdrawals', 'task_claims', 'notifications', 'messages', 'reset_requests'];
+  for (const t of tables) {
+    try {
+      const r = await sb.from(t).select('*').limit(1);
+      results[t] = { exists: !r.error, error: r.error ? r.error.message : null, count: r.data ? r.data.length : 0 };
+    } catch (e) {
+      results[t] = { exists: false, error: e.message };
+    }
+  }
+
+  // Try a raw insert to users to see the exact error
+  try {
+    const testInsert = await sb.from('users').insert({ username: '__debug_test__' }).select();
+    results._insertTest = { success: !testInsert.error, error: testInsert.error ? testInsert.error.message : null };
+    if (!testInsert.error) {
+      // Clean up
+      await sb.from('users').delete().eq('username', '__debug_test__');
+    }
+  } catch (e) {
+    results._insertTest = { success: false, error: e.message };
+  }
+
+  res.json({ connected: true, isSupabase: isSupabase(), results });
+});
+
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 }
