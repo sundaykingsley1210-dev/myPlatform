@@ -404,8 +404,19 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   const creditAmount = amount - vatAmount;
 
   try {
-    const userRes = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
+    const userRes = await dbQuery('users', 'balance, vip_level', { id: req.userId }, { single: true });
     if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
+
+    const userVip = userRes.data.vip_level || 0;
+    if (userVip < 1) return res.status(400).json({ error: 'No VIP level assigned' });
+
+    const plan = VIP_PLANS[userVip];
+    if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
+
+    const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = dayNames[ng.getDay()];
+    if (currentDay !== plan.withdrawalDay) return res.status(400).json({ error: `Withdrawals for VIP ${userVip} are only on ${plan.withdrawalDay}s` });
 
     await dbUpdate('users', { balance: userRes.data.balance - amount }, { id: req.userId });
     await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
