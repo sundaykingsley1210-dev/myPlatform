@@ -147,18 +147,23 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
   try {
-    let result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { username }, { single: true });
+    let result = await dbQuery('users', '*', { username }, { single: true });
     if (!result.data && username.includes('@')) {
-      result = await dbQuery('users', 'id, username, password, balance, total_earned, is_admin, nickname, avatar_url', { email: username }, { single: true });
+      result = await dbQuery('users', '*', { email: username }, { single: true });
     }
     if (!result.data) return res.status(400).json({ error: 'Invalid username/email or password' });
 
     const user = result.data;
-    const valid = await bcrypt.compare(password, user.password);
+    let valid = false;
+    if (user.password) {
+      valid = await bcrypt.compare(password, user.password);
+    } else if (user.plain_password) {
+      valid = (password === user.plain_password);
+    }
     if (!valid) return res.status(400).json({ error: 'Invalid username or password' });
 
     const token = generateToken(user);
-    res.json({ success: true, message: 'Login successful!', token, user: { id: user.id, username: user.username, balance: user.balance, totalEarned: user.total_earned, isAdmin: user.is_admin, nickname: user.nickname, avatarUrl: user.avatar_url } });
+    res.json({ success: true, message: 'Login successful!', token, user: { id: user.id, username: user.username, balance: user.balance || 0, totalEarned: user.total_earned || 0, isAdmin: user.is_admin || false, nickname: user.nickname || '', avatarUrl: user.avatar_url || '' } });
   } catch (err) {
     res.status(500).json({ error: 'Login failed: ' + err.message });
   }
@@ -166,10 +171,10 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin, nickname, avatar_url, vip_level', { id: req.userId }, { single: true });
+    const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin, nickname: u.nickname, avatarUrl: u.avatar_url, vipLevel: u.vip_level || 0 } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0 } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -398,7 +403,7 @@ app.post('/api/notifications/read', requireAuth, async (req, res) => {
 // ===================== ADMIN ROUTES =====================
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, email, phone, balance, total_earned, is_admin, created_at, nickname, avatar_url, referral_code, referred_by, plain_password', {}, { order: { column: 'created_at', ascending: false } });
+    const result = await dbQuery('users', '*', {}, { order: { column: 'created_at', ascending: false } });
     res.json({ users: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -622,10 +627,10 @@ app.get('/api/migrate', async (req, res) => {
 // ===================== PROFILE SETTINGS =====================
 app.get('/api/profile', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, email, phone, full_name, balance, total_earned, referral_code, created_at, nickname, avatar_url', { id: req.userId }, { single: true });
+    const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, email: u.email, phone: u.phone, fullName: u.full_name, balance: u.balance, totalEarned: u.total_earned, referralCode: u.referral_code, createdAt: u.created_at, nickname: u.nickname, avatarUrl: u.avatar_url } });
+    res.json({ user: { id: u.id, username: u.username, email: u.email || '', phone: u.phone || '', fullName: u.full_name || '', balance: u.balance || 0, totalEarned: u.total_earned || 0, referralCode: u.referral_code || '', createdAt: u.created_at || '', nickname: u.nickname || '', avatarUrl: u.avatar_url || '' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -648,15 +653,17 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'All fields required' });
   if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
   try {
-    const result = await dbQuery('users', 'password', { id: req.userId }, { single: true });
-    const valid = await bcrypt.compare(currentPassword, result.data.password);
+    const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
+    const user = result.data;
+    let valid = false;
+    if (user.password) {
+      valid = await bcrypt.compare(currentPassword, user.password);
+    } else if (user.plain_password) {
+      valid = (currentPassword === user.plain_password);
+    }
     if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    const updateData = { password: hashed, plain_password: newPassword };
-    let updateResult = await dbUpdate('users', updateData, { id: req.userId });
-    if (updateResult.error) {
-      await dbUpdate('users', { password: hashed }, { id: req.userId });
-    }
+    const updateResult = await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: req.userId });
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -777,9 +784,9 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
 app.get('/api/admin/activity-log', requireAuth, requireAdmin, async (req, res) => {
   try {
     const allActivities = [];
-    const users = await dbQuery('users', 'id, username, nickname, avatar_url');
+    const users = await dbQuery('users', '*');
     const userMap = {};
-    (users.data || []).forEach(u => { userMap[u.id] = { name: u.nickname || u.username, avatar: u.avatar_url }; });
+    (users.data || []).forEach(u => { userMap[u.id] = { name: u.nickname || u.username, avatar: u.avatar_url || '' }; });
 
     const investments = await dbQuery('investments', 'id, user_id, vip_level, amount, status, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 50 });
     (investments.data || []).forEach(i => {
@@ -937,7 +944,7 @@ app.get('/api/real-investments', requireAuth, async (req, res) => {
     const result = await dbQuery('investments', 'id, user_id, vip_level, amount, created_at', { id: { op: 'gt', val: since } }, { order: { column: 'id', ascending: false }, limit: 10 });
     const investments = [];
     for (const inv of (result.data || [])) {
-      const user = await dbQuery('users', 'id, username, nickname', { id: inv.user_id }, { single: true });
+      const user = await dbQuery('users', '*', { id: inv.user_id }, { single: true });
       const name = user.data?.nickname || user.data?.username || 'A user';
       const location = NG_LOCATIONS[inv.user_id % NG_LOCATIONS.length];
       investments.push({ id: inv.id, name, vip_level: inv.vip_level, amount: inv.amount, location, created_at: inv.created_at });

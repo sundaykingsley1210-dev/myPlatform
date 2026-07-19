@@ -6,7 +6,6 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_AN
 let supabase = null;
 let useSupabase = false;
 
-// In-memory fallback tables
 const mem = {
   users: [],
   investments: [],
@@ -32,7 +31,6 @@ function initDatabase() {
 
 function saveDatabase() {}
 
-// ========== IN-MEMORY HELPERS ==========
 function memFilter(rows, filters) {
   return rows.filter(row => {
     for (const [key, value] of Object.entries(filters)) {
@@ -91,14 +89,30 @@ function memUpdate(table, data, filters) {
   return rows;
 }
 
-// ========== MAIN API ==========
-async function dbQuery(table, columns = '*', filters = {}, options = {}) {
-  if (!useSupabase) {
-    const result = memSelect(table, columns, filters, options);
-    if (options.single) return { data: result, error: null };
-    return { data: result || [], error: null };
+function extractMissingColumn(errorMessage) {
+  const patterns = [
+    /column "(\w+)"/i,
+    /Could not find the '(\w+)'/i,
+    /'(\w+)' column/i,
+    /column (\w+) does not exist/i,
+    /column (\w+) of/i
+  ];
+  for (const p of patterns) {
+    const m = errorMessage.match(p);
+    if (m) return m[1];
   }
+  return null;
+}
 
+function isTableNotFoundError(msg) {
+  return msg && (msg.includes('does not exist') || msg.includes('not found') || msg.includes('Could not find the table'));
+}
+
+function isColumnError(msg) {
+  return msg && msg.includes('column') && !isTableNotFoundError(msg);
+}
+
+function buildQuery(table, columns, filters, options) {
   let query = supabase.from(table).select(columns);
   for (const [key, value] of Object.entries(filters)) {
     if (value === null) { query = query.is(key, null); }
@@ -119,13 +133,40 @@ async function dbQuery(table, columns = '*', filters = {}, options = {}) {
   if (options.order) query = query.order(options.order.column, { ascending: options.order.ascending ?? false });
   if (options.limit) query = query.limit(options.limit);
   if (options.single) query = query.single();
-  const result = await query;
-  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
+  return query;
+}
+
+async function dbQuery(table, columns = '*', filters = {}, options = {}) {
+  if (!useSupabase) {
+    const result = memSelect(table, columns, filters, options);
+    if (options.single) return { data: result, error: null };
+    return { data: result || [], error: null };
+  }
+
+  let result = await buildQuery(table, columns, filters, options);
+
+  if (result.error && isTableNotFoundError(result.error.message)) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const memResult = memSelect(table, columns, filters, options);
     if (options.single) return { data: memResult, error: null };
     return { data: memResult || [], error: null };
   }
+
+  if (result.error && isColumnError(result.error.message)) {
+    const badCol = extractMissingColumn(result.error.message);
+    if (badCol && columns !== '*') {
+      const cols = columns.split(',').map(c => c.trim()).filter(c => c !== badCol);
+      if (cols.length > 0) {
+        console.log(`Column "${badCol}" missing in "${table}", retrying with: ${cols.join(', ')}`);
+        return dbQuery(table, cols.join(', '), filters, options);
+      }
+    }
+    if (columns !== '*') {
+      console.log(`Column error on "${table}", retrying with *`);
+      return dbQuery(table, '*', filters, options);
+    }
+  }
+
   return result;
 }
 
@@ -134,23 +175,25 @@ async function dbInsert(table, data) {
     const row = memInsert(table, data);
     return { data: [row], error: null };
   }
+
   let result = await supabase.from(table).insert(data).select();
-  if (result.error && result.error.message && result.error.message.includes('column')) {
-    const keys = Object.keys(data);
-    for (const key of keys) {
-      if (result.error.message.includes(key)) {
-        const newData = { ...data };
-        delete newData[key];
-        result = await supabase.from(table).insert(newData).select();
-        break;
-      }
-    }
-  }
-  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
+
+  if (result.error && isTableNotFoundError(result.error.message)) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const row = memInsert(table, data);
     return { data: [row], error: null };
   }
+
+  if (result.error && isColumnError(result.error.message)) {
+    const badCol = extractMissingColumn(result.error.message);
+    if (badCol && data[badCol] !== undefined) {
+      console.log(`Column "${badCol}" missing in "${table}" insert, retrying without it`);
+      const newData = { ...data };
+      delete newData[badCol];
+      return dbInsert(table, newData);
+    }
+  }
+
   return result;
 }
 
@@ -159,20 +202,44 @@ async function dbUpdate(table, data, filters) {
     const rows = memUpdate(table, data, filters);
     return { data: rows, error: null };
   }
-  let query = supabase.from(table).update(data);
-  for (const [key, value] of Object.entries(filters)) { query = query.eq(key, value); }
-  const result = await query;
-  if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
+
+  let result = await supabase.from(table).update(data);
+  for (const [key, value] of Object.entries(filters)) { result = result.eq(key, value); }
+  result = await result;
+
+  if (result.error && isTableNotFoundError(result.error.message)) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const rows = memUpdate(table, data, filters);
     return { data: rows, error: null };
   }
+
+  if (result.error && isColumnError(result.error.message)) {
+    const badCol = extractMissingColumn(result.error.message);
+    if (badCol && data[badCol] !== undefined) {
+      console.log(`Column "${badCol}" missing in "${table}" update, retrying without it`);
+      const newData = { ...data };
+      delete newData[badCol];
+      return dbUpdate(table, newData, filters);
+    }
+  }
+
   return result;
 }
 
 async function dbUpsert(table, data) {
   if (!useSupabase) { return dbInsert(table, data); }
-  return supabase.from(table).upsert(data).select();
+  let result = await supabase.from(table).upsert(data).select();
+
+  if (result.error && isColumnError(result.error.message)) {
+    const badCol = extractMissingColumn(result.error.message);
+    if (badCol && data[badCol] !== undefined) {
+      const newData = { ...data };
+      delete newData[badCol];
+      return dbUpsert(table, newData);
+    }
+  }
+
+  return result;
 }
 
 async function dbDelete(table, filters) {
