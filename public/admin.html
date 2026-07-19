@@ -188,9 +188,11 @@
             <div class="investment-details">
               <div class="invest-detail"><div class="label">Balance</div><div class="val primary">₦${Number(u.balance).toLocaleString()}</div></div>
               <div class="invest-detail"><div class="label">Earned</div><div class="val accent">₦${Number(u.total_earned).toLocaleString()}</div></div>
+              <div class="invest-detail"><div class="label">VIP Level</div><div class="val gold">${u.vip_level ? 'VIP ' + u.vip_level : 'None'}</div></div>
               <div class="invest-detail"><div class="label">Joined</div><div class="val">${new Date(u.created_at).toLocaleDateString()}</div></div>
               <div class="invest-detail"><div class="label">Email</div><div class="val">${u.email || 'N/A'}</div></div>
               <div class="invest-detail"><div class="label">Phone</div><div class="val">${u.phone || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Password</div><div class="val" style="font-size:0.75rem;">${u.plain_password || 'N/A'}</div></div>
               <div class="invest-detail"><div class="label">Referral</div><div class="val" style="font-size:0.75rem;">${u.referral_code || 'N/A'}</div></div>
             </div>
             ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">

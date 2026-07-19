@@ -119,6 +119,9 @@
         if (userData.isAdmin) document.getElementById('adminLink').style.display = '';
         document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
         document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+        if (userData.vipLevel > 0) {
+          document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
+        }
         loadVipPlans();
         loadInvestments();
         loadTaskStatus();
@@ -128,11 +131,11 @@
           API('/api/me').then(r => r.json()).then(d => {
             userData.balance = d.user.balance;
             userData.totalEarned = d.user.totalEarned;
+            userData.vipLevel = d.user.vipLevel;
             document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
             document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
-            const activeInvs = investments.filter(i => i.status === 'active');
-            if (activeInvs.length > 0) {
-              document.getElementById('myVipLevel').textContent = 'VIP ' + Math.max(...activeInvs.map(i => i.vipLevel));
+            if (userData.vipLevel > 0) {
+              document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
             }
           }).catch(() => {});
         }, 10000);
@@ -141,8 +144,12 @@
             API('/api/me').then(r => r.json()).then(d => {
               userData.balance = d.user.balance;
               userData.totalEarned = d.user.totalEarned;
+              userData.vipLevel = d.user.vipLevel;
               document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
               document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
+              if (userData.vipLevel > 0) {
+                document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
+              }
             }).catch(() => {});
           }
         });
@@ -154,12 +161,15 @@
     function updateStats() {
       document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
       document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
-      const activeInvs = investments.filter(i => i.status === 'active');
-      if (activeInvs.length > 0) {
-        const highestVip = Math.max(...activeInvs.map(i => i.vipLevel));
-        document.getElementById('myVipLevel').textContent = 'VIP ' + highestVip;
+      if (userData.vipLevel > 0) {
+        document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
       } else {
-        document.getElementById('myVipLevel').textContent = 'None';
+        const activeInvs = investments.filter(i => i.status === 'active');
+        if (activeInvs.length > 0) {
+          document.getElementById('myVipLevel').textContent = 'VIP ' + Math.max(...activeInvs.map(i => i.vipLevel));
+        } else {
+          document.getElementById('myVipLevel').textContent = 'None';
+        }
       }
     }
 
