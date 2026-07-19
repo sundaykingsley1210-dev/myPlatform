@@ -121,6 +121,8 @@
         document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
         if (userData.vipLevel > 0) {
           document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
+        } else {
+          document.getElementById('myVipLevel').textContent = 'None';
         }
         loadVipPlans();
         loadInvestments();
@@ -136,6 +138,8 @@
             document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
             if (userData.vipLevel > 0) {
               document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
+            } else {
+              document.getElementById('myVipLevel').textContent = 'None';
             }
           }).catch(() => {});
         }, 10000);
@@ -149,6 +153,8 @@
               document.getElementById('totalEarnedVal').textContent = formatAmount(userData.totalEarned);
               if (userData.vipLevel > 0) {
                 document.getElementById('myVipLevel').textContent = 'VIP ' + userData.vipLevel;
+              } else {
+                document.getElementById('myVipLevel').textContent = 'None';
               }
             }).catch(() => {});
           }
