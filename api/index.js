@@ -17,7 +17,7 @@ const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.10');
 const monnifyConfigured = MONNIFY_API_KEY && MONNIFY_SECRET;
 
 const VIP_PLANS = {
-  1: { amount: 3000, dailyReturn: 250, withdrawalDay: 'Monday' },
+  1: { amount: 3000, dailyReturn: 250, withdrawalDay: 'Tuesday' },
   2: { amount: 9000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
   3: { amount: 27000, dailyReturn: 2700, withdrawalDay: 'Tuesday' },
   4: { amount: 54000, dailyReturn: 6000, withdrawalDay: 'Wednesday' },
