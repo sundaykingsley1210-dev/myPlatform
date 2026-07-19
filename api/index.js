@@ -46,60 +46,55 @@ app.get('/api/migrate-db', async (req, res) => {
   if (!sb) return res.json({ error: 'No Supabase client' });
 
   const results = [];
+  const https = require('https');
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 
-  // Step 1: Try to create exec_sql function
-  try {
-    const fnSql = `CREATE OR REPLACE FUNCTION exec_sql(query TEXT) RETURNS TEXT AS $$ BEGIN EXECUTE query; RETURN 'OK'; EXCEPTION WHEN OTHERS THEN RETURN SQLERRM; END; $$ LANGUAGE plpgsql SECURITY DEFINER;`;
-    const r = await sb.rpc('exec_sql', { query: fnSql });
-    results.push({ step: 'create exec_sql function', result: r.data });
-  } catch (e) {
-    results.push({ step: 'create exec_sql function', result: 'failed: ' + e.message + ' (you may need to run this SQL manually)' });
+  async function execSql(sql) {
+    return new Promise((resolve) => {
+      const urlObj = new URL('/sql', supabaseUrl);
+      const req2 = https.request(urlObj, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${supabaseKey}`, 'Content-Type': 'application/json', 'apikey': supabaseKey }
+      }, (resp) => {
+        let data = '';
+        resp.on('data', c => data += c);
+        resp.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { resolve({ raw: data, status: resp.statusCode }); } });
+      });
+      req2.on('error', (e) => resolve({ error: e.message }));
+      req2.write(JSON.stringify({ query: sql }));
+      req2.end();
+    });
   }
 
-  // Step 2: Add missing columns one by one
-  const columns = [
-    { table: 'users', col: 'balance', type: 'NUMERIC DEFAULT 0' },
-    { table: 'users', col: 'total_earned', type: 'NUMERIC DEFAULT 0' },
-    { table: 'users', col: 'vip_level', type: 'INTEGER DEFAULT 0' },
-    { table: 'users', col: 'is_admin', type: 'BOOLEAN DEFAULT false' },
-    { table: 'users', col: 'created_at', type: 'TIMESTAMPTZ DEFAULT NOW()' },
-    { table: 'users', col: 'plain_password', type: "TEXT DEFAULT ''" },
-    { table: 'users', col: 'nickname', type: "TEXT DEFAULT ''" },
-    { table: 'users', col: 'avatar_url', type: "TEXT DEFAULT ''" },
-    { table: 'reset_requests', col: 'id', type: 'SERIAL PRIMARY KEY' },
-    { table: 'reset_requests', col: 'user_id', type: 'INTEGER' },
-    { table: 'reset_requests', col: 'username', type: "TEXT DEFAULT ''" },
-    { table: 'reset_requests', col: 'email', type: "TEXT DEFAULT ''" },
-    { table: 'reset_requests', col: 'status', type: "TEXT DEFAULT 'pending'" },
-    { table: 'reset_requests', col: 'created_at', type: 'TIMESTAMPTZ DEFAULT NOW()' },
-  ];
-
-  for (const c of columns) {
+  async function tryExec(sql, label) {
     try {
-      const sql = `ALTER TABLE ${c.table} ADD COLUMN IF NOT EXISTS ${c.col} ${c.type};`;
-      const r = await sb.rpc('exec_sql', { query: sql });
-      results.push({ table: c.table, column: c.col, result: r.data });
-    } catch (e) {
-      results.push({ table: c.table, column: c.col, result: 'error: ' + e.message });
+      const r = await execSql(sql);
+      const ok = r.edges || r.result === 'OK' || (r.raw && r.raw.includes('OK')) || !r.error;
+      results.push({ step: label, result: ok ? 'success' : (r.error || r.raw || 'unknown'), data: r });
+    } catch(e) {
+      results.push({ step: label, result: 'error: ' + e.message });
     }
   }
 
-  // Step 3: Create reset_requests table if it doesn't exist
-  try {
-    const sql = `CREATE TABLE IF NOT EXISTS reset_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT DEFAULT '', email TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW());`;
-    const r = await sb.rpc('exec_sql', { query: sql });
-    results.push({ step: 'create reset_requests table', result: r.data });
-  } catch (e) {
-    results.push({ step: 'create reset_requests table', result: 'error: ' + e.message });
-  }
+  await tryExec("CREATE OR REPLACE FUNCTION exec_sql(query TEXT) RETURNS TEXT AS $$ BEGIN EXECUTE query; RETURN 'OK'; EXCEPTION WHEN OTHERS THEN RETURN SQLERRM; END; $$ LANGUAGE plpgsql SECURITY DEFINER;", 'create exec_sql function');
 
-  // Step 4: Create notifications table if missing
-  try {
-    const sql = `CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT DEFAULT '', message TEXT DEFAULT '', is_read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW());`;
-    const r = await sb.rpc('exec_sql', { query: sql });
-    results.push({ step: 'create notifications table', result: r.data });
-  } catch (e) {
-    results.push({ step: 'create notifications table', result: 'error: ' + e.message });
+  const columns = [
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS balance NUMERIC DEFAULT 0;',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS total_earned NUMERIC DEFAULT 0;',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0;',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS plain_password TEXT DEFAULT \'\';',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT DEFAULT \'\';',
+    'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\';',
+    'CREATE TABLE IF NOT EXISTS reset_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT DEFAULT \'\', email TEXT DEFAULT \'\', status TEXT DEFAULT \'pending\', created_at TIMESTAMPTZ DEFAULT NOW());',
+    'CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title TEXT DEFAULT \'\', message TEXT DEFAULT \'\', is_read BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT NOW());',
+  ];
+
+  for (const sql of columns) {
+    const label = sql.replace(/ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+).*/, '$1.$2').replace(/CREATE TABLE IF NOT EXISTS (\w+).*/, 'create $1');
+    await tryExec(sql, label);
   }
 
   res.json({ success: true, results });
