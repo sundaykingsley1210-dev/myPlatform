@@ -89,9 +89,12 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const referredBy = req.body.referralCode || null;
-    let result = await dbInsert('users', { username, password: hashedPassword, plain_password: password, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
-    if (result.error) {
-      result = await dbInsert('users', { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy });
+    const insertData = { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy };
+    try { insertData.plain_password = password; } catch(e) {}
+    let result = await dbInsert('users', insertData);
+    if (result.error && result.error.message && result.error.message.includes('plain_password')) {
+      delete insertData.plain_password;
+      result = await dbInsert('users', insertData);
     }
 
     if (result.error) return res.status(500).json({ error: 'Registration failed: ' + result.error.message });

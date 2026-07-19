@@ -134,7 +134,18 @@ async function dbInsert(table, data) {
     const row = memInsert(table, data);
     return { data: [row], error: null };
   }
-  const result = await supabase.from(table).insert(data).select();
+  let result = await supabase.from(table).insert(data).select();
+  if (result.error && result.error.message && result.error.message.includes('column')) {
+    const keys = Object.keys(data);
+    for (const key of keys) {
+      if (result.error.message.includes(key)) {
+        const newData = { ...data };
+        delete newData[key];
+        result = await supabase.from(table).insert(newData).select();
+        break;
+      }
+    }
+  }
   if (result.error && result.error.message && (result.error.message.includes('does not exist') || result.error.message.includes('not found') || result.error.message.includes('Could not find'))) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const row = memInsert(table, data);
