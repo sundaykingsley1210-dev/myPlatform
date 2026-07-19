@@ -240,7 +240,6 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
     if (currentVip > 0 && vipLevel !== currentVip + 1) return res.status(400).json({ error: `Can only upgrade from VIP ${currentVip} to VIP ${currentVip + 1}` });
     if (currentVip >= 9) return res.status(400).json({ error: 'Already at maximum VIP level' });
 
-  try {
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 
