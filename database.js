@@ -203,9 +203,9 @@ async function dbUpdate(table, data, filters) {
     return { data: rows, error: null };
   }
 
-  let result = await supabase.from(table).update(data);
-  for (const [key, value] of Object.entries(filters)) { result = result.eq(key, value); }
-  result = await result;
+  let query = supabase.from(table).update(data);
+  for (const [key, value] of Object.entries(filters)) { query = query.eq(key, value); }
+  let result = await query;
 
   if (result.error && isTableNotFoundError(result.error.message)) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
