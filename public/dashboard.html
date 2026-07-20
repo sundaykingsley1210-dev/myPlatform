@@ -16,6 +16,26 @@
   <link rel="stylesheet" href="/css/style.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script>
+    (function() {
+      var SW_VER = 'enrichu-v11';
+      var stored = localStorage.getItem('sw_version');
+      if (stored !== SW_VER) {
+        localStorage.setItem('sw_version', SW_VER);
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) { caches.delete(name); });
+          });
+        }
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(regs) {
+            regs.forEach(function(r) { r.unregister(); });
+          });
+        }
+        window.location.reload(true);
+      }
+    })();
+  </script>
 </head>
 <body>
   <nav class="navbar">
