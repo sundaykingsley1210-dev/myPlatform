@@ -37,7 +37,7 @@
         <div class="dash-stat-card"><div class="label">Pending Withdrawals</div><div class="value gold" id="pendingWithdrawals">0</div></div>
       </div>
 
-      <div id="pendingApprovalsSection" style="display:none;margin-bottom:24px;">
+      <div id="pendingApprovalsSection" style="margin-bottom:24px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
           <h3 style="margin:0;color:#f59e0b;"><i class="fas fa-clock"></i> Pending Payment Approvals <span id="pendingApprovalCount" style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:8px;">0</span></h3>
           <button class="btn btn-outline btn-sm" onclick="switchTab('transactions',document.querySelector('[onclick*=transactions]'))"><i class="fas fa-eye"></i> View All Transactions</button>
@@ -127,17 +127,15 @@
         (usersData.users || []).forEach(u => { userMap[u.id] = u; });
 
         const pending = (data.transactions || []).filter(tx => tx.status === 'pending_approval');
-        const section = document.getElementById('pendingApprovalsSection');
         const list = document.getElementById('pendingApprovalsList');
         const count = document.getElementById('pendingApprovalCount');
 
+        count.textContent = pending.length;
+
         if (pending.length === 0) {
-          section.style.display = 'none';
+          list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);"><i class="fas fa-check-circle" style="font-size:2rem;color:#22c55e;margin-bottom:8px;display:block;"></i><p style="font-weight:600;color:#22c55e;">No pending approvals</p><p style="font-size:0.85rem;">All payment approvals have been processed.</p></div>';
           return;
         }
-
-        section.style.display = 'block';
-        count.textContent = pending.length;
 
         let html = '';
         pending.forEach(tx => {
