@@ -1081,29 +1081,31 @@
 
     // PWA Install Prompt
     let deferredPrompt = null;
+    const isAlreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-      if (!installed) {
-        setTimeout(() => {
-          if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(r => {
-              if (r.outcome === 'accepted') showToast('App installed!', 'success');
-              deferredPrompt = null;
-            });
-          }
-        }, 3000);
+      if (!isAlreadyInstalled) {
+        const dismissed = localStorage.getItem('installDismissed');
+        if (!dismissed) {
+          document.getElementById('installBanner').style.display = 'block';
+        }
       }
     });
 
     function installApp() {
-      if (!deferredPrompt) {
-        showToast('Use your browser menu to install', 'info');
-        return;
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(r => {
+          if (r.outcome === 'accepted') showToast('App installed successfully!', 'success');
+          deferredPrompt = null;
+          document.getElementById('installBanner').style.display = 'none';
+        });
+      } else {
+        showToast('Tap your browser menu > "Add to Home Screen"', 'info');
       }
-      deferredPrompt.prompt();
+    }
       deferredPrompt.userChoice.then(r => {
         if (r.outcome === 'accepted') showToast('App installed!', 'success');
         deferredPrompt = null;
