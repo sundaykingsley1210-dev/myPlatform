@@ -719,16 +719,28 @@
           <p style="color:var(--text-secondary);margin-bottom:20px;">Invite friends and earn <strong style="color:var(--accent);">10% bonus</strong> on their investment</p>
           <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:16px;">
             <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Your Referral Code</div>
-            <div style="font-size:1.5rem;font-weight:900;color:var(--primary);letter-spacing:2px;margin:8px 0;" onclick="copyText('${data.referralCode}')" title="Tap to copy" style="cursor:pointer;">${data.referralCode}</div>
+            <div style="font-size:1.5rem;font-weight:900;color:var(--primary);letter-spacing:2px;margin:8px 0;cursor:pointer;" onclick="copyText('${data.referralCode}')" title="Tap to copy">${data.referralCode}</div>
             <button class="btn btn-outline btn-sm" onclick="copyText('${link}')"><i class="fas fa-copy"></i> Copy Referral Link</button>
           </div>
           <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid ${bonusMatured ? '#22c55e' : 'var(--border)'};margin-bottom:16px;">
             <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Bonus Balance</div>
             <div style="font-size:1.5rem;font-weight:900;color:#a855f7;margin:8px 0;">₦${bonusBal.toLocaleString()}</div>
             ${bonusBal > 0 ? (bonusMatured
-              ? '<div style="color:#22c55e;font-size:0.85rem;margin-bottom:8px;"><i class="fas fa-check-circle"></i> Ready to claim!</div><button class="btn btn-accent" onclick="claimBonus()" id="claimBonusBtn"><i class="fas fa-plus-circle"></i> Add to Balance</button>'
+              ? '<div style="color:#22c55e;font-size:0.85rem;margin-bottom:12px;"><i class="fas fa-check-circle"></i> Ready!</div>'
               : '<div style="color:#ef4444;font-size:0.85rem;"><i class="fas fa-clock"></i> Unlocks in ' + bonusRemaining + ' day(s)</div>')
               : '<div style="color:var(--text-muted);font-size:0.85rem;">No bonus yet</div>'}
+            ${bonusMatured ? `
+              <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <button class="btn btn-accent" onclick="claimBonus()" id="claimBonusBtn"><i class="fas fa-plus-circle"></i> Add to Balance</button>
+                <button class="btn btn-primary" onclick="showBonusWithdrawForm()" id="withdrawBonusBtn"><i class="fas fa-money-bill-wave"></i> Withdraw Bonus</button>
+              </div>
+              <div id="bonusWithdrawForm" style="display:none;margin-top:16px;text-align:left;">
+                <div class="form-group"><label>Bank Name</label><select id="bonusBankName" class="form-input"><option value="">Select Bank</option><option>Access Bank</option><option>GTBank</option><option>First Bank</option><option>UBA</option><option>Zenith Bank</option><option>Fidelity Bank</option><option>Polish Bank</option><option>Wema Bank</option><option>Sterling Bank</option><option>Unity Bank</option><option>Stanbic IBTC</option><option>Ecobank</option><option>Citi Bank</option><option>Keystone Bank</option><option>Union Bank</option><option>SunTrust Bank</option><option>Titan Trust Bank</option><option>Globus Bank</option><option>Providus Bank</option><option>Parallex Bank</option><option>Optimus Bank</option><option>Sparkle</option><option>Kuda Bank</option><option>VBank</option><option>Paga</option><option>OPay</option><option>Moniepoint</option></select></div>
+                <div class="form-group"><label>Account Number</label><input type="text" id="bonusAccountNumber" class="form-input" placeholder="10-digit account number" maxlength="10"></div>
+                <div class="form-group"><label>Account Name</label><input type="text" id="bonusAccountName" class="form-input" placeholder="Account name"></div>
+                <button class="btn btn-accent" onclick="submitBonusWithdraw()" id="submitBonusWithdrawBtn" style="width:100%;">Submit Withdrawal</button>
+              </div>
+            ` : ''}
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
@@ -740,9 +752,43 @@
               <div style="font-size:1.5rem;font-weight:900;color:var(--accent);">₦${Number(data.referralEarnings).toLocaleString()}</div>
             </div>
           </div>
-          ${data.referrals && data.referrals.length ? '<h4 style="text-align:left;margin-bottom:12px;">Your Referrals</h4>' + data.referrals.map(r => '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;"><span>' + r.username + '</span><span style="color:var(--text-muted);font-size:0.8rem;">' + new Date(r.created_at).toLocaleDateString() + '</span></div>').join('') : ''}
+          ${data.referrals && data.referrals.length
+            ? '<h4 style="text-align:left;margin-bottom:12px;">Your Referrals</h4>' + data.referrals.map(r => '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;"><span>' + r.username + '</span><span style="color:var(--text-muted);font-size:0.8rem;">' + new Date(r.created_at).toLocaleDateString() + '</span></div>').join('')
+            : '<div style="padding:32px 16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px dashed var(--border);"><i class="fas fa-user-plus" style="font-size:2.5rem;color:var(--text-muted);margin-bottom:12px;display:block;"></i><h4 style="color:var(--text-secondary);margin-bottom:8px;">No Referrals Yet</h4><p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">Share your referral link with friends to earn 10% bonus on their investment</p><button class="btn btn-primary btn-sm" onclick="copyText('${link}')"><i class="fas fa-share-alt"></i> Share Link</button></div>'}
         </div>`;
       } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    function showBonusWithdrawForm() {
+      const form = document.getElementById('bonusWithdrawForm');
+      const btn = document.getElementById('withdrawBonusBtn');
+      if (form && btn) {
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        btn.style.display = 'none';
+      }
+    }
+
+    async function submitBonusWithdraw() {
+      const bankName = document.getElementById('bonusBankName').value;
+      const accountNumber = document.getElementById('bonusAccountNumber').value;
+      const accountName = document.getElementById('bonusAccountName').value;
+      if (!bankName || !accountNumber || !accountName) { showToast('Fill in all bank details', 'error'); return; }
+      if (accountNumber.length !== 10) { showToast('Account number must be 10 digits', 'error'); return; }
+      const btn = document.getElementById('submitBonusWithdrawBtn');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Processing...';
+      try {
+        const res = await API('/api/withdraw-bonus', { method: 'POST', body: JSON.stringify({ bankName, accountNumber, accountName }) });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          userData.bonusBalance = 0;
+          userData.bonusDate = null;
+          loadReferral();
+        } else {
+          showToast(data.error, 'error');
+          btn.disabled = false; btn.innerHTML = 'Submit Withdrawal';
+        }
+      } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = 'Submit Withdrawal'; }
     }
 
     async function loadSupport() {

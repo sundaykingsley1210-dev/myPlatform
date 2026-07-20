@@ -472,6 +472,52 @@ app.post('/api/claim-bonus', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/withdraw-bonus', requireAuth, async (req, res) => {
+  const { bankName, accountNumber, accountName } = req.body;
+  if (!bankName || !accountNumber || !accountName) return res.status(400).json({ error: 'Bank details required' });
+
+  try {
+    const userRes = await dbQuery('users', 'balance, bonus_balance, bonus_date, vip_level, created_at', { id: req.userId }, { single: true });
+    if (!userRes.data) return res.status(404).json({ error: 'User not found' });
+
+    const bonusBal = parseFloat(userRes.data.bonus_balance) || 0;
+    if (bonusBal <= 0) return res.status(400).json({ error: 'No bonus available' });
+
+    const bonusDate = userRes.data.bonus_date ? new Date(userRes.data.bonus_date) : null;
+    const now = new Date();
+    if (!bonusDate || (now - bonusDate) < 14 * 24 * 60 * 60 * 1000) {
+      const daysLeft = Math.ceil((14 * 24 * 60 * 60 * 1000 - (now - bonusDate)) / (1000 * 60 * 60 * 24));
+      return res.status(400).json({ error: `Bonus unlocks in ${daysLeft} day(s)` });
+    }
+
+    const createdAt = new Date(userRes.data.created_at);
+    const daysSinceReg = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+    if (daysSinceReg < 7) return res.status(400).json({ error: `Wait ${7 - daysSinceReg} more day(s) before withdrawing` });
+
+    const userVip = userRes.data.vip_level || 0;
+    if (userVip < 1) return res.status(400).json({ error: 'No VIP level assigned' });
+
+    const plan = VIP_PLANS[userVip];
+    if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
+
+    const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDay = dayNames[ng.getDay()];
+    if (currentDay !== plan.withdrawalDay) return res.status(400).json({ error: `Withdrawals for VIP ${userVip} are only on ${plan.withdrawalDay}s` });
+
+    const amount = bonusBal;
+    const vatAmount = Math.round(amount * VAT_RATE);
+    const creditAmount = amount - vatAmount;
+
+    await dbUpdate('users', { bonus_balance: 0, bonus_date: null }, { id: req.userId });
+    await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
+
+    await dbInsert('notifications', { user_id: req.userId, title: 'Bonus Withdrawal Submitted', message: `Your bonus withdrawal of ₦${amount.toLocaleString()} has been submitted. You will receive ₦${creditAmount.toLocaleString()} after 10% VAT.` });
+
+    res.json({ success: true, message: `Bonus withdrawal of ₦${amount.toLocaleString()} submitted. You will receive ₦${creditAmount.toLocaleString()} after 10% VAT.`, vatAmount, creditAmount });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/my-withdrawals', requireAuth, async (req, res) => {
   try {
     const result = await dbQuery('withdrawals', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
