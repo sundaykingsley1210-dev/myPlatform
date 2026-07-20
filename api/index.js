@@ -597,8 +597,8 @@ app.post('/api/admin/transaction/:id/approve', requireAuth, requireAdmin, async 
     await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: tx.vip_level }, { id: tx.user_id });
 
     const msg = refundAmount > 0
-      ? `Your VIP ${tx.vip_level} investment has been approved and activated! ₦${refundAmount.toLocaleString()} refunded from previous investment.`
-      : `Your VIP ${tx.vip_level} investment has been approved and activated! You can now collect daily returns.`;
+      ? `Your payment of ₦${tx.amount.toLocaleString()} is approved! ₦${tx.amount.toLocaleString()} has been credited to your account and VIP ${tx.vip_level} has been activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
+      : `Your payment of ₦${tx.amount.toLocaleString()} is approved! ₦${tx.amount.toLocaleString()} has been credited to your account and VIP ${tx.vip_level} has been activated. You can now collect daily returns.`;
 
     await dbInsert('notifications', { user_id: tx.user_id, title: 'Investment Activated!', message: msg });
 
@@ -632,7 +632,7 @@ app.post('/api/admin/transaction/:id/reject', requireAuth, requireAdmin, async (
     if (tx.status !== 'pending_approval') return res.status(400).json({ error: 'Transaction is not pending approval' });
 
     await dbUpdate('transactions', { status: 'rejected' }, { id: tx.id });
-    await dbInsert('notifications', { user_id: tx.user_id, title: 'Payment Rejected', message: `Your payment of ₦${tx.amount.toLocaleString()} for VIP ${tx.vip_level} was not approved. Please contact support if you believe this is an error.` });
+    await dbInsert('notifications', { user_id: tx.user_id, title: 'Payment Rejected', message: 'Your transaction is not approved. Please contact support if you believe this is an error.' });
 
     res.json({ success: true, message: 'Payment rejected' });
   } catch (err) { res.status(500).json({ error: err.message }); }
