@@ -1084,12 +1084,25 @@
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
-      const dismissed = localStorage.getItem('installDismissed');
-      if (!dismissed) document.getElementById('installBanner').style.display = 'block';
+      const installed = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+      if (!installed) {
+        setTimeout(() => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(r => {
+              if (r.outcome === 'accepted') showToast('App installed!', 'success');
+              deferredPrompt = null;
+            });
+          }
+        }, 3000);
+      }
     });
 
     function installApp() {
-      if (!deferredPrompt) { showToast('Use your browser menu to install', 'info'); return; }
+      if (!deferredPrompt) {
+        showToast('Use your browser menu to install', 'info');
+        return;
+      }
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(r => {
         if (r.outcome === 'accepted') showToast('App installed!', 'success');
