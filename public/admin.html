@@ -39,7 +39,7 @@
 
       <div class="dash-tabs">
         <button class="dash-tab active" onclick="switchTab('activity',this)"><i class="fas fa-clock-rotate-left"></i> Activity</button>
-        <button class="dash-tab" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals</button>
+        <button class="dash-tab" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals <span id="pendingWdBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
         <button class="dash-tab" onclick="switchTab('transactions',this)"><i class="fas fa-exchange-alt"></i> Transactions</button>
         <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
@@ -98,6 +98,9 @@
         document.getElementById('totalUsers').textContent = s.totalUsers;
         document.getElementById('totalInvested').textContent = '₦' + s.totalInvestedAmount.toLocaleString();
         document.getElementById('pendingWithdrawals').textContent = s.pendingWithdrawals;
+        const badge = document.getElementById('pendingWdBadge');
+        if (s.pendingWithdrawals > 0) { badge.style.display = 'inline-block'; badge.textContent = s.pendingWithdrawals; }
+        else { badge.style.display = 'none'; }
       } catch (err) {}
     }
 
@@ -648,6 +651,8 @@
         if (!data.user.isAdmin) { window.location.href = '/dashboard.html'; return; }
         loadStats();
         loadActivityLog();
+        setInterval(loadStats, 15000);
+        document.addEventListener('visibilitychange', function() { if (!document.hidden) loadStats(); });
       } catch (err) { window.location.href = '/login.html'; }
     }
 
