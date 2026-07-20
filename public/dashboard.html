@@ -842,7 +842,7 @@
           </div>
           ${data.referrals && data.referrals.length
             ? '<h4 style="text-align:left;margin-bottom:12px;">Your Referrals</h4>' + data.referrals.map(r => '<div style="display:flex;justify-content:space-between;padding:10px 12px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px;"><span>' + r.username + '</span><span style="color:var(--text-muted);font-size:0.8rem;">' + new Date(r.created_at).toLocaleDateString() + '</span></div>').join('')
-            : '<div style="padding:32px 16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px dashed var(--border);"><i class="fas fa-user-plus" style="font-size:2.5rem;color:var(--text-muted);margin-bottom:12px;display:block;"></i><h4 style="color:var(--text-secondary);margin-bottom:8px;">No Referrals Yet</h4><p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">Share your referral link with friends to earn 10% bonus on their investment</p><button class="btn btn-primary btn-sm" onclick="copyText('${link}')"><i class="fas fa-share-alt"></i> Share Link</button></div>'}
+            : '<div style="padding:32px 16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px dashed var(--border);"><i class="fas fa-user-plus" style="font-size:2.5rem;color:var(--text-muted);margin-bottom:12px;display:block;"></i><h4 style="color:var(--text-secondary);margin-bottom:8px;">No Referrals Yet</h4><p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px;">Share your referral link with friends to earn 10% bonus on their investment</p><button class="btn btn-primary btn-sm" onclick="copyText(\'' + link + '\')"><i class="fas fa-share-alt"></i> Share Link</button></div>'}
         </div>`;
       } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
     }
@@ -1059,8 +1059,7 @@
   <script>
     // Register Service Worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(() => {});
-      if ('caches' in window) { caches.keys().then(k => k.forEach(n => caches.delete(n))).catch(() => {}); }
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
     }
 
     // PWA Install Prompt

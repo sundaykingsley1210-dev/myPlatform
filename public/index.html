@@ -533,8 +533,7 @@
     });
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(() => {});
-      if ('caches' in window) { caches.keys().then(k => k.forEach(n => caches.delete(n))).catch(() => {}); }
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
     }
   </script>
 </body>

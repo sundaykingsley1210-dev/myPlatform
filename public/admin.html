@@ -659,7 +659,7 @@
     init();
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister())).catch(() => {});
+      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
     }
   </script>
 </body>
