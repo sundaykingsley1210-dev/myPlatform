@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Dashboard - Enrich U</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/style.css?v=13">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -187,8 +187,10 @@
       document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
       el.classList.add('active');
       document.getElementById('panel-' + tab).classList.add('active');
+      if (tab === 'tasks') loadTasks();
       if (tab === 'investments') loadInvestments();
-      if (tab === 'tasks') { loadTasks(); }
+      if (tab === 'new-invest') renderVipSelect();
+      if (tab === 'withdraw') loadWithdrawInfo();
       if (tab === 'history') loadHistory();
       if (tab === 'install') loadInstallApp();
       if (tab === 'referral') loadReferral();
