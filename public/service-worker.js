@@ -1,4 +1,4 @@
-const CACHE_NAME = 'enrichu-v8';
+const CACHE_NAME = 'enrichu-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
