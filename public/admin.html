@@ -37,6 +37,14 @@
         <div class="dash-stat-card"><div class="label">Pending Withdrawals</div><div class="value gold" id="pendingWithdrawals">0</div></div>
       </div>
 
+      <div id="pendingApprovalsSection" style="display:none;margin-bottom:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <h3 style="margin:0;color:#f59e0b;"><i class="fas fa-clock"></i> Pending Payment Approvals <span id="pendingApprovalCount" style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.8rem;margin-left:8px;">0</span></h3>
+          <button class="btn btn-outline btn-sm" onclick="switchTab('transactions',document.querySelector('[onclick*=transactions]'))"><i class="fas fa-eye"></i> View All Transactions</button>
+        </div>
+        <div id="pendingApprovalsList"></div>
+      </div>
+
       <div class="dash-tabs">
         <button class="dash-tab active" onclick="switchTab('activity',this)"><i class="fas fa-clock-rotate-left"></i> Activity</button>
         <button class="dash-tab" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals <span id="pendingWdBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
@@ -106,6 +114,58 @@
           if (s.pendingPaymentCount > 0) { txBadge.style.display = 'inline-block'; txBadge.textContent = s.pendingPaymentCount; }
           else { txBadge.style.display = 'none'; }
         }
+      } catch (err) {}
+    }
+
+    async function loadPendingApprovals() {
+      try {
+        const res = await API('/api/admin/transactions');
+        const data = await res.json();
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        const userMap = {};
+        (usersData.users || []).forEach(u => { userMap[u.id] = u; });
+
+        const pending = (data.transactions || []).filter(tx => tx.status === 'pending_approval');
+        const section = document.getElementById('pendingApprovalsSection');
+        const list = document.getElementById('pendingApprovalsList');
+        const count = document.getElementById('pendingApprovalCount');
+
+        if (pending.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+
+        section.style.display = 'block';
+        count.textContent = pending.length;
+
+        let html = '';
+        pending.forEach(tx => {
+          const u = userMap[tx.user_id] || {};
+          const displayName = u.nickname || u.username || 'User #' + tx.user_id;
+          html += `<div class="investment-card" style="border-left:3px solid #f59e0b;margin-bottom:10px;">
+            <div class="investment-header">
+              <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
+                ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid #f59e0b;">' : '<div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#f97316);display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.8rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
+                <div>
+                  <div style="font-weight:700;color:#f59e0b;">₦${Number(tx.amount).toLocaleString()}</div>
+                  <div style="font-size:0.8rem;color:var(--text-muted);">${displayName} &bull; VIP ${tx.vip_level || '?'}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-accent btn-sm" onclick="approvePayment(${tx.id})"><i class="fas fa-check"></i> Accept</button>
+                <button class="btn btn-danger btn-sm" onclick="rejectPayment(${tx.id})"><i class="fas fa-times"></i> Reject</button>
+              </div>
+            </div>
+            <div class="investment-details" style="margin-top:8px;">
+              <div class="invest-detail"><div class="label">Bank</div><div class="val">${tx.bank_name || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Account</div><div class="val">${tx.account_number || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Reference</div><div class="val" style="font-size:0.7rem;word-break:break-all;">${tx.reference || 'N/A'}</div></div>
+              <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(tx.created_at).toLocaleString()}</div></div>
+            </div>
+          </div>`;
+        });
+        list.innerHTML = html;
       } catch (err) {}
     }
 
@@ -280,7 +340,7 @@
       const note = prompt('Admin note (optional):') || 'Approved';
       try {
         const res = await API('/api/admin/transaction/' + id + '/approve', { method: 'POST', body: JSON.stringify({ note }) });
-        if (res.ok) { showToast('Payment approved and investment activated', 'success'); loadTransactions(); loadStats(); }
+        if (res.ok) { showToast('Payment approved and investment activated', 'success'); loadTransactions(); loadPendingApprovals(); loadStats(); }
         else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
       } catch (e) { showToast('Error', 'error'); }
     }
@@ -289,7 +349,7 @@
       if (!confirm('Reject this payment? The user will be notified.')) return;
       try {
         const res = await API('/api/admin/transaction/' + id + '/reject', { method: 'POST' });
-        if (res.ok) { showToast('Payment rejected', 'success'); loadTransactions(); }
+        if (res.ok) { showToast('Payment rejected', 'success'); loadTransactions(); loadPendingApprovals(); }
         else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
       } catch (e) { showToast('Error', 'error'); }
     }
@@ -679,9 +739,11 @@
         const data = await res.json();
         if (!data.user.isAdmin) { window.location.href = '/dashboard.html'; return; }
         loadStats();
+        loadPendingApprovals();
         loadActivityLog();
         setInterval(loadStats, 15000);
-        document.addEventListener('visibilitychange', function() { if (!document.hidden) loadStats(); });
+        setInterval(loadPendingApprovals, 15000);
+        document.addEventListener('visibilitychange', function() { if (!document.hidden) { loadStats(); loadPendingApprovals(); } });
       } catch (err) { window.location.href = '/login.html'; }
     }
 
