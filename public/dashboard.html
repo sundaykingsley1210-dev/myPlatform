@@ -539,7 +539,7 @@
 
       infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-crown" style="color:var(--gold);"></i> <strong>VIP Level:</strong> <span style="color:var(--gold);font-weight:700;">${userVip > 0 ? 'VIP ' + userVip : 'None'}</span></p>
-        <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? '₦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? '₦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span>${bonusMatured ? ' <button class="btn btn-accent btn-sm" onclick="claimBonus()" id="claimBonusBtn" style="margin-left:8px;padding:4px 12px;font-size:0.75rem;"><i class="fas fa-plus-circle"></i> Add to Balance</button>' : ''}</p>
         <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Day:</strong> <span style="color:var(--accent);font-weight:700;">${withdrawDay || 'Not assigned'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-clock" style="color:${weeksReady ? '#22c55e' : '#ef4444'};"></i> <strong>Registration Wait:</strong> <span style="color:${weeksReady ? '#22c55e' : '#ef4444'};">${weeksReady ? 'Completed' : (7 - daysSinceReg) + ' day(s) remaining'}</span></p>
         <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
@@ -589,6 +589,28 @@
       document.getElementById('previewAmount').textContent = '₦' + amount.toLocaleString();
       document.getElementById('previewVat').textContent = '-₦' + vat.toLocaleString();
       document.getElementById('previewCredit').textContent = '₦' + credit.toLocaleString();
+    }
+
+    async function claimBonus() {
+      const btn = document.getElementById('claimBonusBtn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Processing...'; }
+      try {
+        const res = await API('/api/claim-bonus', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          userData.balance = data.newBalance;
+          userData.bonusBalance = 0;
+          updateStats();
+          loadWithdrawInfo();
+        } else {
+          showToast(data.error, 'error');
+          if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus-circle"></i> Add to Balance'; }
+        }
+      } catch (err) {
+        showToast('Network error', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus-circle"></i> Add to Balance'; }
+      }
     }
 
     async function submitWithdraw() {
