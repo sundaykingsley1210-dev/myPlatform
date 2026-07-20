@@ -80,6 +80,8 @@ app.get('/api/migrate-db', async (req, res) => {
     "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS reference TEXT DEFAULT ''",
     "ALTER TABLE transactions ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
     "CREATE TABLE IF NOT EXISTS reset_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT DEFAULT '', email TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_date TIMESTAMPTZ DEFAULT NOW()",
   ];
 
   for (const sql of migrations) {
@@ -216,7 +218,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
     const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '' } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '', bonusBalance: parseFloat(u.bonus_balance) || 0, bonusDate: u.bonus_date || '' } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -327,11 +329,11 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
         const referrer = await dbQuery('users', 'id, username, balance, total_earned', { referral_code: investor.data.referred_by }, { single: true });
         if (referrer.data) {
           const bonus = Math.round(tx.amount * 0.10);
-          const refNewBal = referrer.data.balance + bonus;
           const refNewEarned = referrer.data.total_earned + bonus;
-          await dbUpdate('users', { balance: refNewBal, total_earned: refNewEarned }, { id: referrer.data.id });
+          const existingBonus = referrer.data.bonus_balance || 0;
+          await dbUpdate('users', { bonus_balance: existingBonus + bonus, bonus_date: new Date().toISOString(), total_earned: refNewEarned }, { id: referrer.data.id });
           await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${reference}`, bank_name: '', account_number: '', account_name: '' });
-          await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! ${req.username} just invested ₦${tx.amount.toLocaleString()} (VIP ${tx.vip_level}).` });
+          await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! It will be available for withdrawal in 2 weeks. ${req.username} just invested ₦${tx.amount.toLocaleString()} (VIP ${tx.vip_level}).` });
         }
       }
     } catch (e) { console.log('Referral bonus error:', e.message); }
@@ -400,13 +402,19 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   const creditAmount = amount - vatAmount;
 
   try {
-    const userRes = await dbQuery('users', 'balance, vip_level, created_at', { id: req.userId }, { single: true });
+    const userRes = await dbQuery('users', 'balance, vip_level, created_at, bonus_balance, bonus_date', { id: req.userId }, { single: true });
     if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
 
     const createdAt = new Date(userRes.data.created_at);
     const now = new Date();
     const daysSinceReg = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     if (daysSinceReg < 7) return res.status(400).json({ error: `Withdrawals are available 7 days after registration. Please wait ${7 - daysSinceReg} more day(s).` });
+
+    const bonusBal = parseFloat(userRes.data.bonus_balance) || 0;
+    const bonusDate = userRes.data.bonus_date ? new Date(userRes.data.bonus_date) : null;
+    const bonusMatured = bonusBal > 0 && bonusDate && ((now - bonusDate) >= 14 * 24 * 60 * 60 * 1000);
+    const availableBal = (parseFloat(userRes.data.balance) || 0) + (bonusMatured ? bonusBal : 0);
+    if (amount > availableBal) return res.status(400).json({ error: `Insufficient balance. Available: ₦${availableBal.toLocaleString()}${bonusMatured ? '' : ` (₦${bonusBal.toLocaleString()} bonus locked for 2 weeks)`}` });
 
     const userVip = userRes.data.vip_level || 0;
     if (userVip < 1) return res.status(400).json({ error: 'No VIP level assigned' });
@@ -419,7 +427,20 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
     const currentDay = dayNames[ng.getDay()];
     if (currentDay !== plan.withdrawalDay) return res.status(400).json({ error: `Withdrawals for VIP ${userVip} are only on ${plan.withdrawalDay}s` });
 
-    await dbUpdate('users', { balance: userRes.data.balance - amount }, { id: req.userId });
+    let deductFromBonus = 0;
+    let deductFromBalance = amount;
+    if (bonusMatured && bonusBal > 0) {
+      if (amount <= bonusBal) {
+        deductFromBonus = amount;
+        deductFromBalance = 0;
+      } else {
+        deductFromBonus = bonusBal;
+        deductFromBalance = amount - bonusBal;
+      }
+    }
+    const updateData = { balance: userRes.data.balance - deductFromBalance };
+    if (deductFromBonus > 0) updateData.bonus_balance = bonusBal - deductFromBonus;
+    await dbUpdate('users', updateData, { id: req.userId });
     await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
 
     await dbInsert('notifications', { user_id: req.userId, title: 'Withdrawal Submitted', message: `Your withdrawal of ₦${amount.toLocaleString()} has been submitted. VAT (10%): ₦${vatAmount.toLocaleString()}. You will receive: ₦${creditAmount.toLocaleString()}.` });

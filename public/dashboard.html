@@ -520,9 +520,13 @@
       const formDiv = document.getElementById('withdrawForm');
       const bal = Number(userData.balance || 0);
       const userVip = userData.vipLevel || 0;
+      const bonusBal = Number(userData.bonusBalance || 0);
+      const bonusDate = userData.bonusDate ? new Date(userData.bonusDate) : null;
+      const now = new Date();
+      const bonusMatured = bonusBal > 0 && bonusDate && ((now - bonusDate) >= 14 * 24 * 60 * 60 * 1000);
+      const bonusRemaining = bonusMatured ? 0 : (bonusBal > 0 ? Math.ceil((14 * 24 * 60 * 60 * 1000 - (now - bonusDate)) / (1000 * 60 * 60 * 24)) : 0);
 
       const createdDate = new Date(userData.createdAt);
-      const now = new Date();
       const daysSinceReg = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
       const weeksReady = daysSinceReg >= 7;
 
@@ -535,6 +539,7 @@
 
       infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-crown" style="color:var(--gold);"></i> <strong>VIP Level:</strong> <span style="color:var(--gold);font-weight:700;">${userVip > 0 ? 'VIP ' + userVip : 'None'}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? '₦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Day:</strong> <span style="color:var(--accent);font-weight:700;">${withdrawDay || 'Not assigned'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-clock" style="color:${weeksReady ? '#22c55e' : '#ef4444'};"></i> <strong>Registration Wait:</strong> <span style="color:${weeksReady ? '#22c55e' : '#ef4444'};">${weeksReady ? 'Completed' : (7 - daysSinceReg) + ' day(s) remaining'}</span></p>
         <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
