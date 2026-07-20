@@ -521,21 +521,27 @@
       const bal = Number(userData.balance || 0);
       const userVip = userData.vipLevel || 0;
 
+      const createdDate = new Date(userData.createdAt);
+      const now = new Date();
+      const daysSinceReg = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+      const weeksReady = daysSinceReg >= 7;
+
       const ng = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const currentDay = dayNames[ng.getDay()];
       const plan = vipPlans[userVip];
       const withdrawDay = plan ? plan.withdrawalDay : null;
-      const canWithdraw = withdrawDay && currentDay === withdrawDay;
+      const canWithdraw = weeksReady && withdrawDay && currentDay === withdrawDay;
 
       infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-crown" style="color:var(--gold);"></i> <strong>VIP Level:</strong> <span style="color:var(--gold);font-weight:700;">${userVip > 0 ? 'VIP ' + userVip : 'None'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Day:</strong> <span style="color:var(--accent);font-weight:700;">${withdrawDay || 'Not assigned'}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-clock" style="color:${weeksReady ? '#22c55e' : '#ef4444'};"></i> <strong>Registration Wait:</strong> <span style="color:${weeksReady ? '#22c55e' : '#ef4444'};">${weeksReady ? 'Completed' : (7 - daysSinceReg) + ' day(s) remaining'}</span></p>
         <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
 
       selectedWithdrawAmount = 0;
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
-        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${canWithdraw ? 'Select an amount below' : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
+        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${!weeksReady ? 'Withdrawals open 7 days after registration.' : canWithdraw ? 'Select an amount below' : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
         <div class="form-group"><label>Select Amount</label>
           <div id="withdrawAmounts" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
             ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= bal && canWithdraw ? 'pointer' : 'not-allowed'};opacity:${a <= bal && canWithdraw ? '1' : '0.4'};transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}

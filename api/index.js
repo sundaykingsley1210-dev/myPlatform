@@ -216,7 +216,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
     const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0 } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '' } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -400,8 +400,13 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   const creditAmount = amount - vatAmount;
 
   try {
-    const userRes = await dbQuery('users', 'balance, vip_level', { id: req.userId }, { single: true });
+    const userRes = await dbQuery('users', 'balance, vip_level, created_at', { id: req.userId }, { single: true });
     if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
+
+    const createdAt = new Date(userRes.data.created_at);
+    const now = new Date();
+    const daysSinceReg = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+    if (daysSinceReg < 7) return res.status(400).json({ error: `Withdrawals are available 7 days after registration. Please wait ${7 - daysSinceReg} more day(s).` });
 
     const userVip = userRes.data.vip_level || 0;
     if (userVip < 1) return res.status(400).json({ error: 'No VIP level assigned' });
