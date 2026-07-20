@@ -1,10 +1,9 @@
-const CACHE_NAME = 'enrichu-v10';
+const CACHE_NAME = 'enrichu-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/login.html',
   '/register.html',
-  '/dashboard.html',
   '/admin.html',
   '/css/style.css',
   '/manifest.json',
@@ -33,7 +32,7 @@ self.addEventListener('fetch', event => {
     );
     return;
   }
-  if (request.destination === 'document') {
+  if (request.url.includes('dashboard.html') || request.url.includes('admin.html')) {
     event.respondWith(
       fetch(request).then(response => {
         const clone = response.clone();
