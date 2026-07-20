@@ -771,17 +771,34 @@
 
     async function loadInstallApp() {
       const area = document.getElementById('installAppArea');
-      area.innerHTML = `<div class="vip-detail-card" style="text-align:center;">
-        <div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-download"></i></div>
-        <h3 style="margin-bottom:8px;">Install Enrich U App</h3>
-        <p style="color:var(--text-secondary);margin-bottom:24px;">Add to your home screen for quick access — it's free!</p>
-        <div class="install-steps">
-          <div class="install-step"><div class="install-step-num">1</div><div><strong>Android</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the browser menu (3 dots) > "Add to Home screen" or "Install App"</span></div></div>
-          <div class="install-step"><div class="install-step-num">2</div><div><strong>iPhone/iPad</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap the Share button > "Add to Home Screen"</span></div></div>
-          <div class="install-step"><div class="install-step-num">3</div><div><strong>Computer</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Click the install icon in the address bar or use browser menu</span></div></div>
-        </div>
-        <button class="btn btn-primary btn-lg" onclick="installApp()" style="margin-top:20px;width:100%;max-width:400px;"><i class="fas fa-download"></i> Install Now</button>
-      </div>`;
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      const isDesktop = !isIOS && !isAndroid;
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      if (isStandalone) {
+        area.innerHTML = '<div class="vip-detail-card" style="text-align:center;"><div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-check-circle"></i></div><h3 style="margin-bottom:8px;">App Installed!</h3><p style="color:var(--text-secondary);">Enrich U is already installed on your device.</p></div>';
+        return;
+      }
+
+      let installBtn = '';
+      if (deferredPrompt) {
+        installBtn = '<button class="btn btn-primary btn-lg" onclick="installApp()" style="margin-top:20px;width:100%;max-width:400px;"><i class="fas fa-download"></i> Install Now</button>';
+      } else if (isIOS) {
+        installBtn = '<div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);text-align:left;"><p style="font-weight:700;margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> How to install on iPhone:</p><ol style="padding-left:20px;color:var(--text-secondary);font-size:0.85rem;line-height:1.8;"><li>Tap the <strong>Share</strong> button below the address bar</li><li>Scroll down and tap <strong>"Add to Home Screen"</strong></li><li>Tap <strong>"Add"</strong> to confirm</li></ol></div>';
+      } else {
+        installBtn = '<div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);text-align:left;"><p style="font-weight:700;margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> How to install:</p><ol style="padding-left:20px;color:var(--text-secondary);font-size:0.85rem;line-height:1.8;"><li>Tap the browser menu (3 dots)</li><li>Tap <strong>"Add to Home screen"</strong> or <strong>"Install App"</strong></li><li>Confirm to install</li></ol></div>';
+      }
+
+      area.innerHTML = '<div class="vip-detail-card" style="text-align:center;">' +
+        '<div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-download"></i></div>' +
+        '<h3 style="margin-bottom:8px;">Install Enrich U App</h3>' +
+        '<p style="color:var(--text-secondary);margin-bottom:16px;">Add to your home screen for quick access — it\'s free!</p>' +
+        '<div class="install-steps">' +
+        '<div class="install-step"><div class="install-step-num">1</div><div><strong>' + (isIOS ? 'iPhone/iPad' : isAndroid ? 'Android' : 'Computer') + '</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">' + (isIOS ? 'Tap the Share button > "Add to Home Screen"' : isAndroid ? 'Tap browser menu (3 dots) > "Add to Home screen"' : 'Click the install icon in the address bar or use browser menu') + '</span></div></div>' +
+        '<div class="install-step"><div class="install-step-num">2</div><div><strong>Confirm</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap "Add" or "Install" to confirm</span></div></div>' +
+        '<div class="install-step"><div class="install-step-num">3</div><div><strong>Done!</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Open Enrich U from your home screen</span></div></div>' +
+        '</div>' + installBtn + '</div>';
     }
 
     function logout() {
