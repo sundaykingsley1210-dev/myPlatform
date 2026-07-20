@@ -130,9 +130,8 @@
         loadVipPlans().then(() => {
           loadWithdrawInfo();
         });
-        loadInvestments().then(() => {
-          loadTaskStatus();
-        });
+        loadInvestments();
+        loadTaskStatus();
         loadNotifications();
         setInterval(function() {
           API('/api/me').then(r => r.json()).then(d => {
@@ -190,7 +189,7 @@
       el.classList.add('active');
       document.getElementById('panel-' + tab).classList.add('active');
       if (tab === 'investments') loadInvestments();
-      if (tab === 'tasks') { loadInvestments().then(() => loadTaskStatus()); }
+      if (tab === 'tasks') { loadTaskStatus(); }
       if (tab === 'history') loadHistory();
       if (tab === 'install') loadInstallApp();
       if (tab === 'referral') loadReferral();
@@ -496,13 +495,20 @@
 
     async function loadTaskStatus() {
       try {
-        const res = await API('/api/task-status');
-        const data = await res.json();
+        const statusRes = await API('/api/task-status');
+        const statusData = await statusRes.json();
         const msg = document.getElementById('taskStatusMsg');
-        msg.className = data.canClaim ? 'task-status-msg active' : 'task-status-msg inactive';
-        msg.innerHTML = `<i class="fas fa-${data.canClaim ? 'check-circle' : 'clock'}"></i> ${data.message}`;
-        document.querySelectorAll('[id^="claimBtn"]').forEach(btn => btn.disabled = !data.canClaim);
-        renderTaskCards(data.canClaim);
+        msg.className = statusData.canClaim ? 'task-status-msg active' : 'task-status-msg inactive';
+        msg.innerHTML = `<i class="fas fa-${statusData.canClaim ? 'check-circle' : 'clock'}"></i> ${statusData.message}`;
+        if (!investments.length) {
+          try {
+            const invRes = await API('/api/my-investments');
+            const invData = await invRes.json();
+            investments = invData.investments || [];
+          } catch (e) {}
+        }
+        renderTaskCards(statusData.canClaim);
+        document.querySelectorAll('[id^="claimBtn"]').forEach(btn => btn.disabled = !statusData.canClaim);
       } catch (err) {}
     }
 
@@ -539,7 +545,7 @@
       try {
         const res = await API('/api/claim-task', { method: 'POST', body: JSON.stringify({ investmentId }) });
         const data = await res.json();
-        if (res.ok) { showToast(data.message, 'success'); userData.balance = data.newBalance; updateStats(); loadInvestments(); }
+        if (res.ok) { showToast(data.message, 'success'); userData.balance = data.newBalance; updateStats(); loadInvestments().then(() => loadTaskStatus()); }
         else { showToast(data.error, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-hand-pointer"></i> Collect'; }
       } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-hand-pointer"></i> Collect'; }
     }
