@@ -279,67 +279,34 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
     if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
 
     const tx = result.data;
-    if (tx.status === 'completed') return res.json({ success: true, message: 'Payment already verified' });
+    if (tx.status === 'completed') return res.json({ success: true, message: 'Payment already verified and approved' });
+    if (tx.status === 'pending_approval') return res.json({ success: true, message: 'Payment confirmed! Waiting for admin approval.', status: 'pending_approval' });
 
-    const plan = VIP_PLANS[tx.vip_level];
-    const userLocation = NG_LOCATIONS[req.userId % NG_LOCATIONS.length];
-
-    // Add payment amount to wallet
-    const userRes = await dbQuery('users', 'balance, total_earned', { id: req.userId }, { single: true });
-    const newBal = userRes.data.balance + tx.amount;
-    await dbUpdate('users', { balance: newBal }, { id: req.userId });
-
-    // Check if user has existing active investment (upgrade)
-    const existingInv = await dbQuery('investments', 'id, vip_level, amount, status', { user_id: req.userId, status: 'active' });
-    let refundAmount = 0;
-    if (existingInv.data && existingInv.data.length > 0) {
-      for (const inv of existingInv.data) {
-        if (inv.vip_level < tx.vip_level) {
-          refundAmount += inv.amount;
-          await dbUpdate('investments', { status: 'upgraded' }, { id: inv.id });
-          await dbInsert('notifications', { user_id: req.userId, title: 'VIP Upgraded', message: `Your VIP ${inv.vip_level} investment has been upgraded to VIP ${tx.vip_level}. ₦${inv.amount.toLocaleString()} has been refunded to your wallet.` });
+    // Confirm payment via Monnify
+    let paymentConfirmed = false;
+    if (monnifyConfigured) {
+      try {
+        const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
+          headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
+        });
+        if (tokenRes.data?.responseBody?.accessToken) {
+          const txRes = await axios.get(`${MONNIFY_BASE_URL}/api/v2/transactions/${reference}`, {
+            headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}` }
+          });
+          if (txRes.data?.responseBody?.paymentStatus === 'PAID') paymentConfirmed = true;
         }
-      }
+      } catch (e) { console.log('Monnify verify error:', e.message); }
     }
 
-    // Credit refund to wallet
-    if (refundAmount > 0) {
-      const userBal2 = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-      await dbUpdate('users', { balance: userBal2.data.balance + refundAmount }, { id: req.userId });
+    if (!paymentConfirmed) {
+      return res.status(400).json({ error: 'Payment not yet confirmed. Please wait a few minutes after transfer and try again.' });
     }
 
-    // Create new investment
-    await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
-    await dbInsert('investments', { user_id: req.userId, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
+    // Payment confirmed by Monnify — mark as pending admin approval
+    await dbUpdate('transactions', { status: 'pending_approval' }, { id: tx.id });
+    await dbInsert('notifications', { user_id: req.userId, title: 'Payment Confirmed', message: `Your payment of ₦${tx.amount.toLocaleString()} for VIP ${tx.vip_level} has been confirmed and is awaiting admin approval.` });
 
-    // Update user's VIP level + deduct investment amount from wallet
-    const userBal3 = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-    await dbUpdate('users', { balance: userBal3.data.balance - tx.amount, vip_level: tx.vip_level }, { id: req.userId });
-
-    const msg = refundAmount > 0
-      ? `Payment verified! VIP ${tx.vip_level} activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
-      : `Payment verified! Your VIP ${tx.vip_level} investment is now active.`;
-
-    await dbInsert('notifications', { user_id: req.userId, title: 'Investment Activated!', message: msg });
-
-    // Referral bonus: 10% of investment amount
-    try {
-      const investor = await dbQuery('users', 'referred_by', { id: req.userId }, { single: true });
-      if (investor.data && investor.data.referred_by) {
-        const referrer = await dbQuery('users', 'id, username, balance, total_earned', { referral_code: investor.data.referred_by }, { single: true });
-        if (referrer.data) {
-          const bonus = Math.round(tx.amount * 0.10);
-          const refNewEarned = referrer.data.total_earned + bonus;
-          const existingBonus = referrer.data.bonus_balance || 0;
-          await dbUpdate('users', { bonus_balance: existingBonus + bonus, bonus_date: new Date().toISOString(), total_earned: refNewEarned }, { id: referrer.data.id });
-          await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${reference}`, bank_name: '', account_number: '', account_name: '' });
-          await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! It will be available for withdrawal in 2 weeks. ${req.username} just invested ₦${tx.amount.toLocaleString()} (VIP ${tx.vip_level}).` });
-        }
-      }
-    } catch (e) { console.log('Referral bonus error:', e.message); }
-
-    const finalBal = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-    res.json({ success: true, message: msg, newBalance: finalBal.data.balance });
+    return res.json({ success: true, message: 'Payment confirmed! Waiting for admin approval to activate your VIP.', status: 'pending_approval' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -562,14 +529,16 @@ app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
     const investments = await dbQuery('investments', 'id, amount', { status: 'active' });
     const withdrawals = await dbQuery('withdrawals', 'id, amount', { status: 'pending' });
     const totalInvested = await dbQuery('investments', 'amount', {});
+    const pendingPayments = await dbQuery('transactions', 'id', { status: 'pending_approval' });
 
     const totalUsers = users.data?.length || 0;
     const activeInvestments = investments.data?.length || 0;
     const pendingWithdrawals = withdrawals.data?.length || 0;
+    const pendingPaymentCount = pendingPayments.data?.length || 0;
     const totalInvestedAmount = totalInvested.data?.reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
     const pendingWithdrawalAmount = withdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
 
-    res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals, totalInvestedAmount, pendingWithdrawalAmount } });
+    res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals, pendingPaymentCount, totalInvestedAmount, pendingWithdrawalAmount } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -577,6 +546,95 @@ app.get('/api/admin/transactions', requireAuth, requireAdmin, async (req, res) =
   try {
     const result = await dbQuery('transactions', '*', {}, { order: { column: 'created_at', ascending: false } });
     res.json({ transactions: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/transaction/:id/approve', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status, reference', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
+
+    const tx = result.data;
+    if (tx.status === 'completed') return res.status(400).json({ error: 'Transaction already approved' });
+    if (tx.status !== 'pending_approval') return res.status(400).json({ error: 'Transaction is not pending approval' });
+
+    const plan = VIP_PLANS[tx.vip_level];
+    const userLocation = NG_LOCATIONS[tx.user_id % NG_LOCATIONS.length];
+
+    // Add payment amount to wallet
+    const userRes = await dbQuery('users', 'balance, total_earned', { id: tx.user_id }, { single: true });
+    const newBal = (userRes.data.balance || 0) + tx.amount;
+    await dbUpdate('users', { balance: newBal }, { id: tx.user_id });
+
+    // Check if user has existing active investment (upgrade)
+    const existingInv = await dbQuery('investments', 'id, vip_level, amount, status', { user_id: tx.user_id, status: 'active' });
+    let refundAmount = 0;
+    if (existingInv.data && existingInv.data.length > 0) {
+      for (const inv of existingInv.data) {
+        if (inv.vip_level < tx.vip_level) {
+          refundAmount += inv.amount;
+          await dbUpdate('investments', { status: 'upgraded' }, { id: inv.id });
+          await dbInsert('notifications', { user_id: tx.user_id, title: 'VIP Upgraded', message: `Your VIP ${inv.vip_level} investment has been upgraded to VIP ${tx.vip_level}. ₦${inv.amount.toLocaleString()} has been refunded to your wallet.` });
+        }
+      }
+    }
+
+    // Credit refund to wallet
+    if (refundAmount > 0) {
+      const userBal2 = await dbQuery('users', 'balance', { id: tx.user_id }, { single: true });
+      await dbUpdate('users', { balance: (userBal2.data.balance || 0) + refundAmount }, { id: tx.user_id });
+    }
+
+    // Mark transaction as completed
+    await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
+
+    // Create new investment
+    await dbInsert('investments', { user_id: tx.user_id, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
+
+    // Update user's VIP level + deduct investment amount from wallet
+    const userBal3 = await dbQuery('users', 'balance', { id: tx.user_id }, { single: true });
+    await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: tx.vip_level }, { id: tx.user_id });
+
+    const msg = refundAmount > 0
+      ? `Your VIP ${tx.vip_level} investment has been approved and activated! ₦${refundAmount.toLocaleString()} refunded from previous investment.`
+      : `Your VIP ${tx.vip_level} investment has been approved and activated! You can now collect daily returns.`;
+
+    await dbInsert('notifications', { user_id: tx.user_id, title: 'Investment Activated!', message: msg });
+
+    // Referral bonus: 10% of investment amount
+    try {
+      const investor = await dbQuery('users', 'referred_by', { id: tx.user_id }, { single: true });
+      if (investor.data && investor.data.referred_by) {
+        const referrer = await dbQuery('users', 'id, username, balance, total_earned', { referral_code: investor.data.referred_by }, { single: true });
+        if (referrer.data) {
+          const bonus = Math.round(tx.amount * 0.10);
+          const refNewEarned = (referrer.data.total_earned || 0) + bonus;
+          const existingBonus = referrer.data.bonus_balance || 0;
+          await dbUpdate('users', { bonus_balance: existingBonus + bonus, bonus_date: new Date().toISOString(), total_earned: refNewEarned }, { id: referrer.data.id });
+          await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${tx.reference}`, bank_name: '', account_number: '', account_name: '' });
+          await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! It will be available for withdrawal in 2 weeks.` });
+        }
+      }
+    } catch (e) { console.log('Referral bonus error:', e.message); }
+
+    res.json({ success: true, message: 'Payment approved and investment activated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/transaction/:id/reject', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
+
+    const tx = result.data;
+    if (tx.status !== 'pending_approval') return res.status(400).json({ error: 'Transaction is not pending approval' });
+
+    await dbUpdate('transactions', { status: 'rejected' }, { id: tx.id });
+    await dbInsert('notifications', { user_id: tx.user_id, title: 'Payment Rejected', message: `Your payment of ₦${tx.amount.toLocaleString()} for VIP ${tx.vip_level} was not approved. Please contact support if you believe this is an error.` });
+
+    res.json({ success: true, message: 'Payment rejected' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

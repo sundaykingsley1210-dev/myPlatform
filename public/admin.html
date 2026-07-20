@@ -40,7 +40,7 @@
       <div class="dash-tabs">
         <button class="dash-tab active" onclick="switchTab('activity',this)"><i class="fas fa-clock-rotate-left"></i> Activity</button>
         <button class="dash-tab" onclick="switchTab('withdrawals',this)"><i class="fas fa-money-bill-wave"></i> Withdrawals <span id="pendingWdBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
-        <button class="dash-tab" onclick="switchTab('transactions',this)"><i class="fas fa-exchange-alt"></i> Transactions</button>
+        <button class="dash-tab" onclick="switchTab('transactions',this)"><i class="fas fa-exchange-alt"></i> Transactions <span id="pendingTxBadge" style="display:none;background:#f59e0b;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
         <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
         <button class="dash-tab" onclick="switchTab('data',this)"><i class="fas fa-database"></i> Data</button>
@@ -101,6 +101,11 @@
         const badge = document.getElementById('pendingWdBadge');
         if (s.pendingWithdrawals > 0) { badge.style.display = 'inline-block'; badge.textContent = s.pendingWithdrawals; }
         else { badge.style.display = 'none'; }
+        const txBadge = document.getElementById('pendingTxBadge');
+        if (txBadge) {
+          if (s.pendingPaymentCount > 0) { txBadge.style.display = 'inline-block'; txBadge.textContent = s.pendingPaymentCount; }
+          else { txBadge.style.display = 'none'; }
+        }
       } catch (err) {}
     }
 
@@ -220,7 +225,7 @@
         let html = '<div style="margin-bottom:16px;display:flex;gap:12px;flex-wrap:wrap;">';
         html += '<input type="text" id="txSearch" placeholder="Search by reference or user..." oninput="filterTransactions()" style="flex:1;min-width:200px;padding:10px 14px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">';
         html += '<select id="txStatusFilter" onchange="filterTransactions()" style="padding:10px 14px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">';
-        html += '<option value="">All Status</option><option value="pending">Pending</option><option value="completed">Completed</option></select>';
+        html += '<option value="">All Status</option><option value="pending_approval">Needs Approval</option><option value="pending">Pending</option><option value="completed">Completed</option><option value="rejected">Rejected</option></select>';
         html += '</div><div id="transactionsListInner"></div>';
         list.innerHTML = html;
         window._allTransactions = data.transactions;
@@ -238,16 +243,21 @@
       if (!txs.length) { inner.innerHTML = '<div class="empty-state"><i class="fas fa-search"></i><h3>No matching transactions</h3></div>'; return; }
       let html = '';
       txs.forEach(tx => {
-        const c = tx.status === 'completed' ? '#22c55e' : tx.status === 'pending' ? '#f59e0b' : '#ef4444';
+        const c = tx.status === 'completed' ? '#22c55e' : tx.status === 'pending_approval' ? '#f59e0b' : tx.status === 'pending' ? '#6b7280' : '#ef4444';
         const icon = tx.type === 'investment' ? 'fa-arrow-up' : tx.type === 'withdrawal' ? 'fa-arrow-down' : tx.type === 'referral_bonus' ? 'fa-user-friends' : tx.type === 'admin_credit' ? 'fa-plus-circle' : 'fa-exchange-alt';
         const u = (window._userMap || {})[tx.user_id] || {};
         const displayName = u.nickname || u.username || 'User #' + tx.user_id;
+        const approveRejectBtns = tx.status === 'pending_approval' ? `
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn btn-accent btn-sm" onclick="approvePayment(${tx.id})"><i class="fas fa-check"></i> Approve</button>
+            <button class="btn btn-danger btn-sm" onclick="rejectPayment(${tx.id})"><i class="fas fa-times"></i> Reject</button>
+          </div>` : '';
         html += `<div class="investment-card" style="border-left:3px solid ${c};">
           <div class="investment-header">
             <div class="investment-vip" style="display:flex;align-items:center;gap:10px;">
               ${u.avatar_url ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--primary);">' : '<div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:0.7rem;">' + displayName.charAt(0).toUpperCase() + '</div>'}
               <span style="font-weight:700;color:${tx.type === 'investment' ? 'var(--accent)' : tx.type === 'referral_bonus' ? '#a855f7' : 'var(--primary)'};">₦${Number(tx.amount).toLocaleString()}</span>
-              <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${tx.status}</span>
+              <span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${tx.status === 'pending_approval' ? 'Needs Approval' : tx.status}</span>
               <span style="font-size:0.7rem;padding:3px 8px;background:rgba(255,255,255,0.05);border-radius:8px;color:var(--text-muted);"><i class="fas ${icon}"></i> ${tx.type}</span>
             </div>
             <span style="font-size:0.8rem;color:var(--text-muted);">${displayName}</span>
@@ -260,9 +270,28 @@
             <div class="invest-detail"><div class="label">Date</div><div class="val">${new Date(tx.created_at).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">VIP Level</div><div class="val">${tx.vip_level ? 'VIP ' + tx.vip_level : 'N/A'}</div></div>
             </div>
+            ${approveRejectBtns}
           </div>`;
       });
       inner.innerHTML = html;
+    }
+
+    async function approvePayment(id) {
+      const note = prompt('Admin note (optional):') || 'Approved';
+      try {
+        const res = await API('/api/admin/transaction/' + id + '/approve', { method: 'POST', body: JSON.stringify({ note }) });
+        if (res.ok) { showToast('Payment approved and investment activated', 'success'); loadTransactions(); loadStats(); }
+        else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
+      } catch (e) { showToast('Error', 'error'); }
+    }
+
+    async function rejectPayment(id) {
+      if (!confirm('Reject this payment? The user will be notified.')) return;
+      try {
+        const res = await API('/api/admin/transaction/' + id + '/reject', { method: 'POST' });
+        if (res.ok) { showToast('Payment rejected', 'success'); loadTransactions(); }
+        else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
+      } catch (e) { showToast('Error', 'error'); }
     }
 
     function filterTransactions() {

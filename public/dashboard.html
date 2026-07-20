@@ -402,13 +402,18 @@
         try {
           const res = await API('/api/verify-payment', { method: 'POST', body: JSON.stringify({ reference }) });
           const data = await res.json();
-          if (res.ok && data.message !== 'Transaction not found') {
+          if (res.ok) {
             clearInterval(autoVerifyInterval);
-            clearInterval(countdownInterval);
-            showToast('Payment verified! Investment activated.', 'success');
-            loadInvestments();
-            loadUserData();
-            document.getElementById('paymentArea').style.display = 'none';
+            if (countdownInterval) clearInterval(countdownInterval);
+            if (data.status === 'pending_approval') {
+              showPendingApproval();
+              showToast(data.message, 'success');
+            } else {
+              showToast('Payment verified! Investment activated.', 'success');
+              loadInvestments();
+              loadUserData();
+              document.getElementById('paymentArea').style.display = 'none';
+            }
           }
         } catch (e) {}
       }, 10000);
@@ -431,10 +436,15 @@
         if (res.ok) {
           if (autoVerifyInterval) clearInterval(autoVerifyInterval);
           if (countdownInterval) clearInterval(countdownInterval);
-          showToast(data.message, 'success');
-          loadInvestments();
-          loadUserData();
-          document.getElementById('paymentArea').style.display = 'none';
+          if (data.status === 'pending_approval') {
+            showToast(data.message, 'success');
+            showPendingApproval();
+          } else {
+            showToast(data.message, 'success');
+            loadInvestments();
+            loadUserData();
+            document.getElementById('paymentArea').style.display = 'none';
+          }
         } else {
           showToast(data.error || 'Payment not yet confirmed. Please wait a few minutes after transfer.', 'error');
           if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; }
@@ -443,6 +453,19 @@
         showToast('Verification failed. Try again.', 'error');
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> I\'ve Made Payment'; }
       }
+    }
+
+    function showPendingApproval() {
+      const area = document.getElementById('generatedPayment');
+      if (!area) return;
+      const pendingDiv = document.createElement('div');
+      pendingDiv.id = 'pendingApprovalMsg';
+      pendingDiv.style.cssText = 'padding:20px;background:rgba(245,158,11,0.08);border-radius:var(--radius-sm);border:1px solid rgba(245,158,11,0.3);text-align:center;margin-top:16px;';
+      pendingDiv.innerHTML = '<i class="fas fa-clock" style="color:#f59e0b;font-size:2rem;"></i><p style="font-weight:700;color:#f59e0b;margin:10px 0 6px;">Payment Confirmed - Awaiting Admin Approval</p><p style="font-size:0.85rem;color:var(--text-secondary);">Your payment has been received. An admin will review and approve it shortly. Your VIP will be activated once approved.</p>';
+      const existingPending = document.getElementById('pendingApprovalMsg');
+      if (!existingPending) area.appendChild(pendingDiv);
+      const verifyBtn = document.getElementById('verifyBtn');
+      if (verifyBtn) { verifyBtn.disabled = true; verifyBtn.innerHTML = '<i class="fas fa-clock"></i> Awaiting Approval'; }
     }
 
     function copyText(text) {
