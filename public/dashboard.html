@@ -78,6 +78,9 @@
       <div class="dash-panel" id="panel-withdraw">
         <div id="withdrawInfo" style="margin-bottom:20px;padding:16px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border);"></div>
         <div id="withdrawForm"></div>
+        <div style="margin-top:24px;">
+          <div id="withdrawHistory"></div>
+        </div>
       </div>
       <div class="dash-panel" id="panel-history"><div id="historyList"></div></div>
       <div class="dash-panel" id="panel-install"><div id="installAppArea"></div></div>
@@ -561,6 +564,7 @@
         <div class="form-group"><label>Account Number</label><input type="text" id="withdrawAccount" placeholder="10-digit number" maxlength="10" ${!canWithdraw ? 'disabled' : ''}></div>
         <div class="form-group"><label>Account Name</label><input type="text" id="withdrawAccountName" placeholder="Account holder name" ${!canWithdraw ? 'disabled' : ''}></div>
         <button class="btn btn-primary btn-block btn-lg" onclick="submitWithdraw()" id="withdrawBtn" ${!canWithdraw ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}><i class="fas fa-paper-plane"></i> Submit</button></div>`;
+      loadWithdrawHistory();
     }
 
     function selectWithdrawAmount(amount) {
@@ -589,6 +593,27 @@
       document.getElementById('previewAmount').textContent = '₦' + amount.toLocaleString();
       document.getElementById('previewVat').textContent = '-₦' + vat.toLocaleString();
       document.getElementById('previewCredit').textContent = '₦' + credit.toLocaleString();
+    }
+
+    async function loadWithdrawHistory() {
+      const el = document.getElementById('withdrawHistory');
+      if (!el) return;
+      try {
+        const res = await API('/api/my-withdrawals');
+        const data = await res.json();
+        if (!data.withdrawals || !data.withdrawals.length) {
+          el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);"><i class="fas fa-history" style="font-size:1.5rem;margin-bottom:8px;display:block;"></i><p>No withdrawal requests yet</p></div>';
+          return;
+        }
+        let html = '<h3 style="margin-bottom:16px;"><i class="fas fa-history" style="color:var(--primary);margin-right:8px;"></i> Withdrawal Requests</h3>';
+        data.withdrawals.forEach(w => {
+          const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
+          const vat = w.vatAmount || Math.round(Number(w.amount) * 0.10);
+          const credit = w.creditAmount || (Number(w.amount) - vat);
+          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): ₦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: ₦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
+        });
+        el.innerHTML = html;
+      } catch (err) { el.innerHTML = ''; }
     }
 
     async function claimBonus() {
