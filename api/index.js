@@ -979,6 +979,21 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/admin/delete-investment/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('investments', 'user_id, vip_level, amount, status', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Investment not found' });
+
+    const inv = result.data;
+    await dbUpdate('investments', { status: 'deleted' }, { id: parseInt(id) });
+
+    await dbInsert('notifications', { user_id: inv.user_id, title: 'Investment Removed', message: `Your VIP ${inv.vip_level} investment (₦${Number(inv.amount).toLocaleString()}) has been removed by admin.` });
+
+    res.json({ success: true, message: 'Investment deleted' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== ADMIN ACTIVITY LOG =====================
 app.get('/api/admin/activity-log', requireAuth, requireAdmin, async (req, res) => {
   try {
