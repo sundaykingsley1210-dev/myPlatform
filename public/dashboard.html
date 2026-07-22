@@ -1148,13 +1148,15 @@
     function _checkReal() {
       API('/api/real-investments?since=' + _lastInvId).then(function(r){return r.json();}).then(function(d){
         if(d.investments&&d.investments.length){d.investments.forEach(function(inv){
-          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+inv.name+'</span> from '+inv.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP '+inv.vip_level+' \u2014 \u20A6'+Number(inv.amount).toLocaleString()+'</div>','\uD83C\uDF89','blue');
+          var fakeName = _rndItem(ngNames);
+          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+fakeName+'</span> from '+inv.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP '+inv.vip_level+' \u2014 \u20A6'+Number(inv.amount).toLocaleString()+'</div>','\uD83C\uDF89','blue');
           _lastInvId=Math.max(_lastInvId,inv.id);
         });}
       }).catch(function(){});
       API('/api/real-withdrawals?since=' + _lastWdId).then(function(r){return r.json();}).then(function(d){
         if(d.withdrawals&&d.withdrawals.length){d.withdrawals.forEach(function(w){
-          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+w.name+'</span> from '+w.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6'+Number(w.amount).toLocaleString()+'</div>','\uD83D\uDCB0','green');
+          var fakeName = _rndItem(ngNames);
+          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+fakeName+'</span> from '+w.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6'+Number(w.amount).toLocaleString()+'</div>','\uD83D\uDCB0','green');
           _lastWdId=Math.max(_lastWdId,w.id);
         });}
       }).catch(function(){});
