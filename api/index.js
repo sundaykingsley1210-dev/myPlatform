@@ -82,6 +82,7 @@ app.get('/api/migrate-db', async (req, res) => {
     "CREATE TABLE IF NOT EXISTS reset_requests (id SERIAL PRIMARY KEY, user_id INTEGER, username TEXT DEFAULT '', email TEXT DEFAULT '', status TEXT DEFAULT 'pending', created_at TIMESTAMPTZ DEFAULT NOW())",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_date TIMESTAMPTZ DEFAULT NOW()",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS earnings_balance NUMERIC DEFAULT 0",
   ];
 
   for (const sql of migrations) {
