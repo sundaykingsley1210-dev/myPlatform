@@ -1199,10 +1199,10 @@
     style.textContent = '@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}';
     document.head.appendChild(style);
 
-    // Show fake popups every 20 seconds
+    // Show fake popups every 10 seconds
     function startFakePopups() {
       function scheduleNext() {
-        setTimeout(() => { generateFakeInvestment(); scheduleNext(); }, 20000);
+        setTimeout(() => { generateFakeInvestment(); scheduleNext(); }, 10000);
       }
       setTimeout(() => { generateFakeInvestment(); scheduleNext(); }, 5000);
     }
