@@ -608,6 +608,7 @@
       const infoDiv = document.getElementById('withdrawInfo');
       const formDiv = document.getElementById('withdrawForm');
       const bal = Number(userData.balance || 0);
+      const earningsBal = Number(userData.earningsBalance || 0);
       const userVip = userData.vipLevel || 0;
       const bonusBal = Number(userData.bonusBalance || 0);
       const bonusDate = userData.bonusDate ? new Date(userData.bonusDate) : null;
@@ -626,7 +627,8 @@
       const withdrawDay = plan ? plan.withdrawalDay : null;
       const canWithdraw = weeksReady && withdrawDay && currentDay === withdrawDay;
 
-      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
+      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Total Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-coins" style="color:#22c55e;"></i> <strong>Withdrawable Earnings:</strong> <span style="color:#22c55e;font-weight:700;">₦${earningsBal.toLocaleString()}</span> <span style="font-size:0.75rem;color:var(--text-muted);">(from daily tasks)</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-crown" style="color:var(--gold);"></i> <strong>VIP Level:</strong> <span style="color:var(--gold);font-weight:700;">${userVip > 0 ? 'VIP ' + userVip : 'None'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? '₦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span>${bonusMatured ? ' <button class="btn btn-accent btn-sm" onclick="claimBonus()" id="claimBonusBtn" style="margin-left:8px;padding:4px 12px;font-size:0.75rem;"><i class="fas fa-plus-circle"></i> Add to Balance</button>' : ''}</p>
         <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Day:</strong> <span style="color:var(--accent);font-weight:700;">${withdrawDay || 'Not assigned'}</span></p>
@@ -635,10 +637,10 @@
 
       selectedWithdrawAmount = 0;
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
-        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${!weeksReady ? 'Withdrawals open 7 days after registration.' : canWithdraw ? 'Select an amount below' : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
+        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${!weeksReady ? 'Withdrawals open 7 days after registration.' : canWithdraw ? 'Available to withdraw: ₦' + earningsBal.toLocaleString() : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
         <div class="form-group"><label>Select Amount</label>
           <div id="withdrawAmounts" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
-            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= bal && canWithdraw ? 'pointer' : 'not-allowed'};opacity:${a <= bal && canWithdraw ? '1' : '0.4'};transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
+            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= earningsBal && canWithdraw ? 'pointer' : 'not-allowed'};opacity:${a <= earningsBal && canWithdraw ? '1' : '0.4'};transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
           </div>
         </div>
         <div id="withdrawPreview" style="padding:12px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin-bottom:16px;display:none;">
@@ -655,9 +657,9 @@
 
     function selectWithdrawAmount(amount) {
       selectedWithdrawAmount = amount;
-      const bal = userData.balance || 0;
-      if (amount > bal) {
-        showToast('Insufficient balance. Your balance is ₦' + Number(bal).toLocaleString(), 'error');
+      const earningsBal = userData.earningsBalance || 0;
+      if (amount > earningsBal) {
+        showToast('Insufficient earnings. Available: ₦' + Number(earningsBal).toLocaleString(), 'error');
         selectedWithdrawAmount = 0;
         document.querySelectorAll('.withdraw-amt-btn').forEach(b => { b.style.borderColor = 'var(--border)'; b.style.background = 'var(--bg-dark)'; });
         document.getElementById('withdrawPreview').style.display = 'none';

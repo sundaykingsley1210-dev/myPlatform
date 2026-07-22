@@ -219,7 +219,7 @@ app.get('/api/me', requireAuth, async (req, res) => {
     const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
-    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '', bonusBalance: parseFloat(u.bonus_balance) || 0, bonusDate: u.bonus_date || '' } });
+    res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '', bonusBalance: parseFloat(u.bonus_balance) || 0, bonusDate: u.bonus_date || '', earningsBalance: parseFloat(u.earnings_balance) || 0 } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -349,10 +349,11 @@ app.post('/api/claim-task', requireAuth, async (req, res) => {
     await dbInsert('task_claims', { user_id: req.userId, investment_id: investmentId, claim_date: today, amount: inv.daily_return });
     await dbUpdate('investments', { total_collected: inv.total_collected + inv.daily_return, days_collected: inv.days_collected + 1 }, { id: investmentId });
 
-    const userRes = await dbQuery('users', 'balance, total_earned', { id: req.userId }, { single: true });
+    const userRes = await dbQuery('users', 'balance, total_earned, earnings_balance', { id: req.userId }, { single: true });
     const newBal = userRes.data.balance + inv.daily_return;
     const newEarned = userRes.data.total_earned + inv.daily_return;
-    await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: req.userId });
+    const newEarnings = (userRes.data.earnings_balance || 0) + inv.daily_return;
+    await dbUpdate('users', { balance: newBal, total_earned: newEarned, earnings_balance: newEarnings }, { id: req.userId });
 
     await dbInsert('notifications', { user_id: req.userId, title: 'Daily Return Collected', message: `₦${inv.daily_return.toLocaleString()} has been added to your wallet from VIP ${inv.vip_level}.` });
 
@@ -370,8 +371,9 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
   const creditAmount = amount - vatAmount;
 
   try {
-    const userRes = await dbQuery('users', 'balance, vip_level, created_at, bonus_balance, bonus_date', { id: req.userId }, { single: true });
-    if (userRes.data.balance < amount) return res.status(400).json({ error: 'Insufficient balance' });
+    const userRes = await dbQuery('users', 'balance, vip_level, created_at, bonus_balance, bonus_date, earnings_balance', { id: req.userId }, { single: true });
+    const earningsBal = parseFloat(userRes.data.earnings_balance) || 0;
+    if (earningsBal < amount) return res.status(400).json({ error: `Insufficient earnings balance. Available: ₦${earningsBal.toLocaleString()}. You can only withdraw money earned from daily tasks.` });
 
     const createdAt = new Date(userRes.data.created_at);
     const now = new Date();
@@ -396,25 +398,25 @@ app.post('/api/withdraw', requireAuth, async (req, res) => {
     if (currentDay !== plan.withdrawalDay) return res.status(400).json({ error: `Withdrawals for VIP ${userVip} are only on ${plan.withdrawalDay}s` });
 
     let deductFromBonus = 0;
-    let deductFromBalance = amount;
+    let deductFromEarnings = amount;
     if (bonusMatured && bonusBal > 0) {
       if (amount <= bonusBal) {
         deductFromBonus = amount;
-        deductFromBalance = 0;
+        deductFromEarnings = 0;
       } else {
         deductFromBonus = bonusBal;
-        deductFromBalance = amount - bonusBal;
+        deductFromEarnings = amount - bonusBal;
       }
     }
-    const updateData = { balance: userRes.data.balance - deductFromBalance };
+    const updateData = { earnings_balance: earningsBal - deductFromEarnings };
     if (deductFromBonus > 0) updateData.bonus_balance = bonusBal - deductFromBonus;
     await dbUpdate('users', updateData, { id: req.userId });
     await dbInsert('withdrawals', { user_id: req.userId, amount, bank_name: bankName, account_number: accountNumber, account_name: accountName, status: 'pending', vat_amount: vatAmount, credit_amount: creditAmount });
 
     await dbInsert('notifications', { user_id: req.userId, title: 'Withdrawal Submitted', message: `Your withdrawal of ₦${amount.toLocaleString()} has been submitted. VAT (10%): ₦${vatAmount.toLocaleString()}. You will receive: ₦${creditAmount.toLocaleString()}.` });
 
-    const newBal = await dbQuery('users', 'balance', { id: req.userId }, { single: true });
-    res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted. You will receive ₦${creditAmount.toLocaleString()} after 10% VAT.`, newBalance: newBal.data.balance, vatAmount, creditAmount });
+    const newEarnings = await dbQuery('users', 'earnings_balance', { id: req.userId }, { single: true });
+    res.json({ success: true, message: `Withdrawal of ₦${amount.toLocaleString()} submitted. You will receive ₦${creditAmount.toLocaleString()} after 10% VAT.`, newBalance: newEarnings.data.earnings_balance, vatAmount, creditAmount });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
