@@ -1081,6 +1081,93 @@
     }
 
     init();
+
+    // ===================== INVESTMENT POP-UP NOTIFICATIONS =====================
+    var ngNames = [
+      'Friday Smart','Miracle Stephanie','Felix Monday','Peter Daniel','Angela Okafor','Princewill Godsent',
+      'Chidinma Eze','Emeka Nwosu','Aisha Bello','Yusuf Abdullahi','Ngozi Okonkwo','Tunde Adeyemi',
+      'Fatima Hassan','Blessing Ogundimu','David Ikenna','Grace Obi','Samuel Effiong','Blessing Nwankwo',
+      'Ibrahim Suleiman','Chukwuemeka Obi','Amina Dikko','Sunday Agbaje','Patience Nnamdi','Johnson Olatunde',
+      'Rosemary Ibe','Kemi Afolabi','Ifeanyi Chukwu','Halima Bello','Chinedu Okoro','Stella Bassey',
+      'Obinna Nwachukwu','Rashidat Adewale','Precious Uche','Michael Onyema','Zainab Mohammed','Daniel Osei',
+      'Chioma Uzoma','Abubakar Danjuma','Nneka Obi','Olumide Akinyemi','Sade Ogunleye','Emmanuel Bassey',
+      'Funke Adekunle','Ibrahim Musa','Adaeze Nwosu','Bashiru Aliyu','Oluwaseun Balogun','Ngozi Azubuike',
+      'Lawal Ibrahim','Bukola Oyenusi','Chidera Okafor','Ikenna Eze','Haliru Sumaila','Blessing Jombo',
+      'Temitope Adesanya','Chidi Nwankwo','Maryam Yusuf','Olaide Babatunde','Ebenezer Ofor','Victoria Alabi',
+      'Sani Abubakar','Chiamaka Nwosu','Tunde Fashola','Yetunde Alao','Moses Igwe','Zainab Sani',
+      'Kelvin Obiora','Folashade Ogundipe','Ahmed Bello','Ifeoma Chinedu','Dele Ogunlesi','Amaka Nwachukwu',
+      'Ismail Oyewale','Peace Ogundimu','Emeka Anyanwu','Rashidat Salami','Joseph Okafor','Linda Nkem',
+      'Opeyemi Ogunbayo','Chukwuma Izuegbu','Aisha Suleiman','Kayode Adeleke','Nneka Ogbonna','Sunday Okon',
+      'Aminu Bello','Chiara Uche','Femi Adebayo','Gloria Nwachukwu','Adamu Mohammed','Bimpe Coker',
+      'Chukwuebuka Obi','Hauwa Dikko','Segun Olatunji','Ifeanyichukwu Eze','Halima Aliyu','Omolara Adeyemi',
+      'Uchechukwu Nwosu','Folake Coker','Obiora Nnamdi','Chika Okonkwo','Temilola Adeyemi','Nkemdilim Eze'
+    ];
+    var ngStates = [
+      'Lagos','Abuja','Rivers','Kano','Oyo','Delta','Enugu','Anambra','Imo','Abia','Akwa Ibom','Cross River',
+      'Edo','Ondo','Osun','Ogun','Ekiti','Kwara','Kogi','Benue','Nasarawa','Plateau','Taraba','Adamawa',
+      'Borno','Yobe','Gombe','Bauchi','Sokoto','Zamfara','Kebbi','Katsina','Jigawa','Kaduna','Niger','Bayelsa'
+    ];
+    var vipAmounts = { 1: 3000, 2: 9000, 3: 27000, 4: 54000, 5: 81000, 6: 120000, 7: 200000, 8: 230000, 9: 280000 };
+    var wdAmounts = [8000, 25000, 70000, 200000, 500000, 1200000];
+
+    function _rndItem(a) { return a[Math.floor(Math.random() * a.length)]; }
+    function _rndVip() { return Math.floor(Math.random() * 9) + 1; }
+
+    function _showPopup(text, icon, color) {
+      var ex = document.getElementById('investPopup');
+      if (ex) ex.remove();
+      var p = document.createElement('div');
+      p.id = 'investPopup';
+      var bg = color === 'green' ? 'linear-gradient(135deg,rgba(34,197,94,0.95),rgba(16,185,129,0.85))' : 'linear-gradient(135deg,rgba(0,87,255,0.95),rgba(0,87,255,0.85))';
+      p.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;max-width:380px;width:calc(100% - 32px);padding:14px 18px;background:' + bg + ';backdrop-filter:blur(10px);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4);color:white;font-family:Inter,sans-serif;animation:slideUp 0.4s ease;display:flex;align-items:center;gap:12px;';
+      p.innerHTML = '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">' + icon + '</div><div style="flex:1;min-width:0;">' + text + '</div>';
+      document.body.appendChild(p);
+      setTimeout(function() { p.style.animation = 'slideDown 0.4s ease forwards'; setTimeout(function() { p.remove(); }, 400); }, 3000);
+    }
+
+    function _showDemoInv() {
+      var n = _rndItem(ngNames), s = _rndItem(ngStates), v = _rndVip(), a = vipAmounts[v];
+      _showPopup('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + n + '</span> from ' + s + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP ' + v + ' \u2014 \u20A6' + a.toLocaleString() + '</div><div style="font-size:0.65rem;opacity:0.7;margin-top:2px;">\uD83D\uDCCD ' + s + ', Nigeria</div>', '\uD83C\uDF89', 'blue');
+    }
+
+    function _showDemoWd() {
+      var n = _rndItem(ngNames), s = _rndItem(ngStates), a = _rndItem(wdAmounts);
+      _showPopup('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + n + '</span> from ' + s + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6' + a.toLocaleString() + '</div><div style="font-size:0.65rem;opacity:0.7;margin-top:2px;">\uD83D\uDCCD ' + s + ', Nigeria</div>', '\uD83D\uDCB0', 'green');
+    }
+
+    var _lastInvId = 0, _lastWdId = 0, _popupQ = [], _showingP = false;
+    function _processQ() {
+      if (_showingP || _popupQ.length === 0) return;
+      _showingP = true;
+      var nx = _popupQ.shift();
+      _showPopup(nx.text, nx.icon, nx.color);
+      setTimeout(function() { _showingP = false; _processQ(); }, 4000);
+    }
+    function _queueP(t, i, c) { _popupQ.push({text:t,icon:i,color:c}); _processQ(); }
+
+    function _checkReal() {
+      API('/api/real-investments?since=' + _lastInvId).then(function(r){return r.json();}).then(function(d){
+        if(d.investments&&d.investments.length){d.investments.forEach(function(inv){
+          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+inv.name+'</span> from '+inv.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP '+inv.vip_level+' \u2014 \u20A6'+Number(inv.amount).toLocaleString()+'</div>','\uD83C\uDF89','blue');
+          _lastInvId=Math.max(_lastInvId,inv.id);
+        });}
+      }).catch(function(){});
+      API('/api/real-withdrawals?since=' + _lastWdId).then(function(r){return r.json();}).then(function(d){
+        if(d.withdrawals&&d.withdrawals.length){d.withdrawals.forEach(function(w){
+          _queueP('<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">'+w.name+'</span> from '+w.location+'</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6'+Number(w.amount).toLocaleString()+'</div>','\uD83D\uDCB0','green');
+          _lastWdId=Math.max(_lastWdId,w.id);
+        });}
+      }).catch(function(){});
+    }
+
+    // Add CSS
+    var _animS = document.createElement('style');
+    _animS.textContent = '@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}';
+    document.head.appendChild(_animS);
+
+    // Start: first popup after 3s, then random 8-15s
+    setTimeout(function(){ _showDemoInv(); _checkReal(); setInterval(_checkReal, 10000); }, 3000);
+    (function _demoLoop(){ setTimeout(function(){ if(Math.random()>0.45){_showDemoInv();}else{_showDemoWd();} _demoLoop(); }, 8000+Math.random()*7000); })();
   </script>
 
   <!-- Install App Banner -->
@@ -1131,12 +1218,6 @@
         showToast('Tap your browser menu > "Add to Home Screen"', 'info');
       }
     }
-      deferredPrompt.userChoice.then(r => {
-        if (r.outcome === 'accepted') showToast('App installed!', 'success');
-        deferredPrompt = null;
-        document.getElementById('installBanner').style.display = 'none';
-      });
-    }
 
     function dismissInstall() {
       document.getElementById('installBanner').style.display = 'none';
@@ -1147,132 +1228,6 @@
       document.getElementById('installBanner').style.display = 'none';
       showToast('Enrich U installed!', 'success');
     });
-
-    // ===================== INVESTMENT POP-UP NOTIFICATIONS =====================
-    var ngNames = [
-      'Friday Smart','Miracle Stephanie','Felix Monday','Peter Daniel','Angela Okafor','Princewill Godsent',
-      'Chidinma Eze','Emeka Nwosu','Aisha Bello','Yusuf Abdullahi','Ngozi Okonkwo','Tunde Adeyemi',
-      'Fatima Hassan','Blessing Ogundimu','David Ikenna','Grace Obi','Samuel Effiong','Blessing Nwankwo',
-      'Ibrahim Suleiman','Chukwuemeka Obi','Amina Dikko','Sunday Agbaje','Patience Nnamdi','Johnson Olatunde',
-      'Rosemary Ibe','Kemi Afolabi','Ifeanyi Chukwu','Halima Bello','Chinedu Okoro','Stella Bassey',
-      'Obinna Nwachukwu','Rashidat Adewale','Precious Uche','Michael Onyema','Zainab Mohammed','Daniel Osei',
-      'Chioma Uzoma','Abubakar Danjuma','Nneka Obi','Olumide Akinyemi','Sade Ogunleye','Emmanuel Bassey',
-      'Funke Adekunle','Ibrahim Musa','Adaeze Nwosu','Bashiru Aliyu','Oluwaseun Balogun','Ngozi Azubuike',
-      'Lawal Ibrahim','Bukola Oyenusi','Chidera Okafor','Ikenna Eze','Haliru Sumaila','Blessing Jombo',
-      'Temitope Adesanya','Chidi Nwankwo','Maryam Yusuf','Olaide Babatunde','Ebenezer Ofor','Victoria Alabi',
-      'Sani Abubakar','Chiamaka Nwosu','Tunde Fashola','Yetunde Alao','Moses Igwe','Zainab Sani',
-      'Kelvin Obiora','Folashade Ogundipe','Ahmed Bello','Ifeoma Chinedu','Dele Ogunlesi','Amaka Nwachukwu',
-      'Ismail Oyewale','Peace Ogundimu','Emeka Anyanwu','Rashidat Salami','Joseph Okafor','Linda Nkem',
-      'Opeyemi Ogunbayo','Chukwuma Izuegbu','Aisha Suleiman','Kayode Adeleke','Nneka Ogbonna','Sunday Okon',
-      'Aminu Bello','Chiara Uche','Femi Adebayo','Gloria Nwachukwu','Adamu Mohammed','Bimpe Coker',
-      'Chukwuebuka Obi','Hauwa Dikko','Segun Olatunji','Ifeanyichukwu Eze','Halima Aliyu','Omolara Adeyemi',
-      'Uchechukwu Nwosu','Folake Coker','Obiora Nnamdi','Chika Okonkwo','Temilola Adeyemi','Nkemdilim Eze'
-    ];
-    var ngStates = [
-      'Lagos','Abuja','Rivers','Kano','Oyo','Delta','Enugu','Anambra','Imo','Abia','Akwa Ibom','Cross River',
-      'Edo','Ondo','Osun','Ogun','Ekiti','Kwara','Kogi','Benue','Nasarawa','Plateau','Taraba','Adamawa',
-      'Borno','Yobe','Gombe','Bauchi','Sokoto','Zamfara','Kebbi','Katsina','Jigawa','Kaduna','Niger','Bayelsa'
-    ];
-    var vipAmounts = { 1: 3000, 2: 9000, 3: 27000, 4: 54000, 5: 81000, 6: 120000, 7: 200000, 8: 230000, 9: 280000 };
-    var withdrawAmounts = [8000, 25000, 70000, 200000, 500000, 1200000];
-
-    function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-    function randomVip() { return Math.floor(Math.random() * 9) + 1; }
-
-    function showPopup(text, icon, color) {
-      var existing = document.getElementById('investPopup');
-      if (existing) existing.remove();
-      var popup = document.createElement('div');
-      popup.id = 'investPopup';
-      var bg = color === 'green' ? 'linear-gradient(135deg,rgba(34,197,94,0.95),rgba(16,185,129,0.85))' : 'linear-gradient(135deg,rgba(0,87,255,0.95),rgba(0,87,255,0.85))';
-      popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;max-width:380px;width:calc(100% - 32px);padding:14px 18px;background:' + bg + ';backdrop-filter:blur(10px);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4);color:white;font-family:Inter,sans-serif;animation:slideUp 0.4s ease;display:flex;align-items:center;gap:12px;';
-      popup.innerHTML = '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">' + icon + '</div><div style="flex:1;min-width:0;">' + text + '</div>';
-      document.body.appendChild(popup);
-      setTimeout(function() { popup.style.animation = 'slideDown 0.4s ease forwards'; setTimeout(function() { popup.remove(); }, 400); }, 3000);
-    }
-
-    function showDemoInvestment() {
-      var name = randomItem(ngNames);
-      var state = randomItem(ngStates);
-      var vip = randomVip();
-      var amount = vipAmounts[vip];
-      var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + name + '</span> from ' + state + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP ' + vip + ' \u2014 \u20A6' + amount.toLocaleString() + '</div><div style="font-size:0.65rem;opacity:0.7;margin-top:2px;">\uD83D\uDCCD ' + state + ', Nigeria</div>';
-      showPopup(txt, '\uD83C\uDF89', 'blue');
-    }
-
-    function showDemoWithdrawal() {
-      var name = randomItem(ngNames);
-      var state = randomItem(ngStates);
-      var amount = randomItem(withdrawAmounts);
-      var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + name + '</span> from ' + state + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6' + amount.toLocaleString() + '</div><div style="font-size:0.65rem;opacity:0.7;margin-top:2px;">\uD83D\uDCCD ' + state + ', Nigeria</div>';
-      showPopup(txt, '\uD83D\uDCB0', 'green');
-    }
-
-    // Real transaction polling
-    var lastInvId = 0;
-    var lastWdId = 0;
-    var popupQueue = [];
-    var showingPopup = false;
-
-    function processQueue() {
-      if (showingPopup || popupQueue.length === 0) return;
-      showingPopup = true;
-      var next = popupQueue.shift();
-      showPopup(next.text, next.icon, next.color);
-      setTimeout(function() { showingPopup = false; processQueue(); }, 4000);
-    }
-
-    function queuePopup(text, icon, color) {
-      popupQueue.push({ text: text, icon: icon, color: color });
-      processQueue();
-    }
-
-    function checkRealPopups() {
-      API('/api/real-investments?since=' + lastInvId).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.investments && data.investments.length) {
-          data.investments.forEach(function(inv) {
-            var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + inv.name + '</span> from ' + inv.location + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP ' + inv.vip_level + ' \u2014 \u20A6' + Number(inv.amount).toLocaleString() + '</div>';
-            queuePopup(txt, '\uD83C\uDF89', 'blue');
-            lastInvId = Math.max(lastInvId, inv.id);
-          });
-        }
-      }).catch(function() {});
-
-      API('/api/real-withdrawals?since=' + lastWdId).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.withdrawals && data.withdrawals.length) {
-          data.withdrawals.forEach(function(w) {
-            var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + w.name + '</span> from ' + w.location + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6' + Number(w.amount).toLocaleString() + '</div>';
-            queuePopup(txt, '\uD83D\uDCB0', 'green');
-            lastWdId = Math.max(lastWdId, w.id);
-          });
-        }
-      }).catch(function() {});
-    }
-
-    // Demo popups at random intervals (8-15 seconds)
-    function startDemoPopups() {
-      function scheduleNext() {
-        var delay = 8000 + Math.random() * 7000;
-        setTimeout(function() {
-          if (Math.random() > 0.45) { showDemoInvestment(); } else { showDemoWithdrawal(); }
-          scheduleNext();
-        }, delay);
-      }
-      scheduleNext();
-    }
-
-    // Add CSS animations
-    var animStyle = document.createElement('style');
-    animStyle.textContent = '@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}';
-    document.head.appendChild(animStyle);
-
-    // Start everything after 3 seconds
-    setTimeout(function() {
-      showDemoInvestment();
-      checkRealPopups();
-      startDemoPopups();
-      setInterval(checkRealPopups, 10000);
-    }, 3000);
   </script>
 </body>
 </html>
