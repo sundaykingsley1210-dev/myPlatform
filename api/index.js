@@ -1167,6 +1167,21 @@ app.get('/api/real-investments', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/real-withdrawals', requireAuth, async (req, res) => {
+  try {
+    const since = parseInt(req.query.since) || 0;
+    const result = await dbQuery('withdrawals', 'id, user_id, amount, created_at', { id: { op: 'gt', val: since }, status: 'completed' }, { order: { column: 'id', ascending: false }, limit: 10 });
+    const withdrawals = [];
+    for (const w of (result.data || [])) {
+      const user = await dbQuery('users', '*', { id: w.user_id }, { single: true });
+      const name = user.data?.nickname || user.data?.username || 'A user';
+      const location = NG_LOCATIONS[w.user_id % NG_LOCATIONS.length];
+      withdrawals.push({ id: w.id, name, amount: w.amount, location, created_at: w.created_at });
+    }
+    res.json({ withdrawals });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== HTML ROUTES =====================
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'index.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, '..', 'public', 'register.html')));

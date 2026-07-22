@@ -1175,67 +1175,52 @@
     function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
     function randomVip() { return Math.floor(Math.random() * 9) + 1; }
 
-    function showInvestmentPopup(name, type, amount, location, extra) {
+    function showPopup(text, icon) {
       const existing = document.getElementById('investPopup');
       if (existing) existing.remove();
       const popup = document.createElement('div');
       popup.id = 'investPopup';
       popup.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;max-width:380px;width:calc(100% - 32px);padding:14px 18px;background:linear-gradient(135deg,rgba(0,87,255,0.95),rgba(0,87,255,0.85));backdrop-filter:blur(10px);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,0.4);color:white;font-family:Inter,sans-serif;animation:slideUp 0.4s ease;display:flex;align-items:center;gap:12px;';
-      const icon = type === 'withdrawal' ? '💰' : '🎉';
-      const detail = type === 'withdrawal'
-        ? 'Withdrew \u20A6' + amount.toLocaleString()
-        : 'Invested ' + extra + ' \u2014 \u20A6' + amount.toLocaleString();
-      popup.innerHTML = '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">' + icon + '</div><div style="flex:1;min-width:0;"><div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + name + '</span> from ' + location + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">' + detail + '</div></div>';
+      popup.innerHTML = '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem;">' + icon + '</div><div style="flex:1;min-width:0;">' + text + '</div>';
       document.body.appendChild(popup);
-      setTimeout(() => { popup.style.animation = 'slideDown 0.4s ease forwards'; setTimeout(() => popup.remove(), 400); }, 3000);
+      setTimeout(function() { popup.style.animation = 'slideDown 0.4s ease forwards'; setTimeout(function() { popup.remove(); }, 400); }, 3000);
     }
 
-    const withdrawAmounts = [1800, 8000, 25000, 70000, 200000, 500000, 1200000, 3000000];
+    // Real investment + withdrawal polling
+    let lastInvId = 0;
+    let lastWdId = 0;
 
-    function generateFakePopup() {
-      const name = randomItem(ngNames);
-      const state = randomItem(ngStates);
-      const isWithdrawal = Math.random() > 0.5;
-      if (isWithdrawal) {
-        const amount = randomItem(withdrawAmounts);
-        showInvestmentPopup(name, 'withdrawal', amount, state);
-      } else {
-        const vip = randomVip();
-        const amount = vipAmounts[vip];
-        showInvestmentPopup(name, 'investment', amount, state, 'VIP ' + vip);
-      }
+    function checkPopups() {
+      // Real investments
+      API('/api/real-investments?since=' + lastInvId).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.investments && data.investments.length) {
+          data.investments.forEach(function(inv) {
+            var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + inv.name + '</span> from ' + inv.location + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Invested VIP ' + inv.vip_level + ' \u2014 \u20A6' + Number(inv.amount).toLocaleString() + '</div>';
+            showPopup(txt, '\uD83C\uDF89');
+            lastInvId = Math.max(lastInvId, inv.id);
+          });
+        }
+      }).catch(function() {});
+
+      // Real withdrawals
+      API('/api/real-withdrawals?since=' + lastWdId).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.withdrawals && data.withdrawals.length) {
+          data.withdrawals.forEach(function(w) {
+            var txt = '<div style="font-size:0.85rem;font-weight:700;line-height:1.3;">Congratulations <span style="color:#FFD700;">' + w.name + '</span> from ' + w.location + '</div><div style="font-size:0.75rem;opacity:0.9;margin-top:2px;">Withdrew \u20A6' + Number(w.amount).toLocaleString() + '</div>';
+            showPopup(txt, '\uD83D\uDCB0');
+            lastWdId = Math.max(lastWdId, w.id);
+          });
+        }
+      }).catch(function() {});
     }
 
     // Add CSS animations
-    const style = document.createElement('style');
+    var style = document.createElement('style');
     style.textContent = '@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}@keyframes slideDown{from{opacity:1;transform:translateX(-50%) translateY(0)}to{opacity:0;transform:translateX(-50%) translateY(20px)}}';
     document.head.appendChild(style);
 
-    // Show fake popups every 10 seconds
-    function startFakePopups() {
-      function scheduleNext() {
-        setTimeout(() => { generateFakePopup(); scheduleNext(); }, 10000);
-      }
-      setTimeout(() => { generateFakePopup(); scheduleNext(); }, 5000);
-    }
-    startFakePopups();
-
-    // Poll for real investments
-    let lastInvestmentId = 0;
-    async function checkRealInvestments() {
-      try {
-        const res = await API('/api/real-investments?since=' + lastInvestmentId);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.investments && data.investments.length) {
-          data.investments.forEach(inv => {
-            showInvestmentPopup(inv.name, 'investment', inv.amount, inv.location, 'VIP ' + inv.vip_level);
-            lastInvestmentId = Math.max(lastInvestmentId, inv.id);
-          });
-        }
-      } catch (e) {}
-    }
-    setInterval(checkRealInvestments, 10000);
+    // Start polling real data every 10 seconds
+    setTimeout(function() { checkPopups(); setInterval(checkPopups, 10000); }, 3000);
   </script>
 </body>
 </html>
