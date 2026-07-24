@@ -410,10 +410,25 @@
 
     async function loadAdminSupport() {
       try {
+        const usersRes2 = await API('/api/admin/users');
+        const usersData2 = await usersRes2.json();
+        const allUsers = usersData2.users || [];
+        const userOptions = allUsers.map(u => '<option value="' + u.id + '">' + (u.nickname || u.username) + ' (' + (u.email || 'no email') + ')</option>').join('');
         const res = await API('/api/admin/messages');
         const data = await res.json();
         const list = document.getElementById('supportList');
-        if (!data.messages || !data.messages.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-headset"></i><h3>No Messages</h3><p>User support messages will appear here</p></div>'; return; }
+        let sendHtml = `<div class="investment-card" style="margin-bottom:16px;">
+          <h4 style="margin-bottom:12px;"><i class="fas fa-paper-plane" style="color:var(--primary);margin-right:8px;"></i> Send Message to User</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="adminMsgUser" style="flex:1;min-width:180px;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+              <option value="">-- Select User --</option>
+              ${userOptions}
+            </select>
+            <input type="text" id="adminMsgText" placeholder="Type message..." style="flex:2;min-width:200px;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+            <button class="btn btn-primary btn-sm" onclick="sendDirectMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+          </div>
+        </div>`;
+        if (!data.messages || !data.messages.length) { list.innerHTML = sendHtml + '<div class="empty-state"><i class="fas fa-headset"></i><h3>No Messages</h3><p>User support messages will appear here</p></div>'; return; }
         const grouped = {};
         const userNames = {};
         data.messages.forEach(m => {
@@ -442,8 +457,24 @@
             </div>
           </div>`;
         }
-        list.innerHTML = html;
+        list.innerHTML = sendHtml + html;
       } catch (err) { document.getElementById('supportList').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    async function sendDirectMessage() {
+      const userSelect = document.getElementById('adminMsgUser');
+      const msgInput = document.getElementById('adminMsgText');
+      const userId = parseInt(userSelect.value);
+      const msg = msgInput.value.trim();
+      if (!userId) return showToast('Please select a user', 'error');
+      if (!msg) return showToast('Please type a message', 'error');
+      try {
+        await API('/api/admin/messages', { method: 'POST', body: JSON.stringify({ userId, message: msg }) });
+        msgInput.value = '';
+        userSelect.value = '';
+        showToast('Message sent', 'success');
+        loadAdminSupport();
+      } catch (err) { showToast('Failed to send', 'error'); }
     }
 
     function loadDataManage() {
