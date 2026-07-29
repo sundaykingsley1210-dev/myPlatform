@@ -141,6 +141,15 @@
         loadTasks();
         loadNotifications();
         checkAdminMessages();
+        API('/api/check-refund').then(r => r.json()).then(d => {
+          if (d.refundedCount > 0) {
+            API('/api/me').then(r => r.json()).then(me => {
+              userData.balance = me.user.balance;
+              document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+            }).catch(() => {});
+            showToast('₦' + Number(d.totalRefunded).toLocaleString() + ' refunded to your wallet', 'success');
+          }
+        }).catch(() => {});
         setInterval(checkAdminMessages, 15000);
         setInterval(function() {
           API('/api/me').then(r => r.json()).then(d => {

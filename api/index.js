@@ -634,8 +634,8 @@ app.post('/api/admin/transaction/:id/reject', requireAuth, requireAdmin, async (
     const tx = result.data;
     if (tx.status !== 'pending_approval') return res.status(400).json({ error: 'Transaction is not pending approval' });
 
-    await dbUpdate('transactions', { status: 'rejected' }, { id: tx.id });
-    await dbInsert('notifications', { user_id: tx.user_id, title: 'Payment Rejected', message: 'Your transaction is not approved. Please contact support if you believe this is an error.' });
+    await dbUpdate('transactions', { status: 'rejected', rejected_at: new Date().toISOString() }, { id: tx.id });
+    await dbInsert('notifications', { user_id: tx.user_id, title: 'Payment Rejected', message: `Your payment of ₦${(tx.amount || 0).toLocaleString()} has been rejected. The amount will be automatically refunded to your wallet after 6 hours.` });
 
     res.json({ success: true, message: 'Payment rejected' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -815,6 +815,7 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT DEFAULT \'\'' }); results.push('users.nickname added'); } catch (e) { results.push('users.nickname: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\'' }); results.push('users.avatar_url added'); } catch (e) { results.push('users.avatar_url: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('transactions.rejected_at added'); } catch (e) { results.push('transactions.rejected_at: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
     try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
@@ -937,6 +938,32 @@ app.get('/api/referral', requireAuth, async (req, res) => {
     const earnings = await dbQuery('transactions', 'amount', { user_id: req.userId, type: 'referral_bonus' });
     const totalEarnings = earnings.data?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
     res.json({ referralCode: user.data.referral_code, referralCount: count, referralEarnings: totalEarnings, referrals: referrals.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/check-refund', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('transactions', 'id, amount, rejected_at, status', { user_id: req.userId, status: 'rejected' });
+    const transactions = result.data || [];
+    const now = Date.now();
+    const sixHrs = 6 * 60 * 60 * 1000;
+    let refundedCount = 0;
+    let totalRefunded = 0;
+    for (const tx of transactions) {
+      const rejectedAt = tx.rejected_at ? new Date(tx.rejected_at).getTime() : 0;
+      if (rejectedAt && (now - rejectedAt) >= sixHrs) {
+        const userResult = await dbQuery('users', 'id, balance', { id: req.userId }, { single: true });
+        if (userResult.data) {
+          const newBalance = (userResult.data.balance || 0) + (tx.amount || 0);
+          await dbUpdate('users', { balance: newBalance }, { id: req.userId });
+          await dbUpdate('transactions', { status: 'refunded' }, { id: tx.id });
+          await dbInsert('notifications', { user_id: req.userId, title: 'Refund Credited', message: `₦${(tx.amount || 0).toLocaleString()} has been refunded to your wallet from a rejected transaction.` });
+          refundedCount++;
+          totalRefunded += (tx.amount || 0);
+        }
+      }
+    }
+    res.json({ refundedCount, totalRefunded });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
