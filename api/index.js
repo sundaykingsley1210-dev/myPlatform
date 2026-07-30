@@ -819,12 +819,6 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
-    try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
-    try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
-    try { await sb.from('task_claims').delete().neq('id', 0); results.push('task_claims cleared'); } catch (e) { results.push('clear task_claims: ' + e.message); }
-    try { await sb.from('notifications').delete().neq('id', 0); results.push('notifications cleared'); } catch (e) { results.push('clear notifications: ' + e.message); }
-    try { await sb.from('messages').delete().neq('id', 0); results.push('messages cleared'); } catch (e) { results.push('clear messages: ' + e.message); }
-    try { await sb.from('investments').delete().neq('id', 0); results.push('investments cleared'); } catch (e) { results.push('clear investments: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
