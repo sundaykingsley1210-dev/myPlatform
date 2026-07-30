@@ -74,6 +74,7 @@
         <button class="dash-tab" onclick="switchTab('history',this)"><i class="fas fa-history"></i> History</button>
         <button class="dash-tab" onclick="switchTab('install',this)"><i class="fas fa-download"></i> Install App</button>
         <button class="dash-tab" onclick="switchTab('referral',this)"><i class="fas fa-users"></i> Referral</button>
+        <button class="dash-tab" onclick="switchTab('savings',this)"><i class="fas fa-piggy-bank"></i> Savings</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support <span id="msgBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
         <button class="dash-tab" onclick="switchTab('profile',this)"><i class="fas fa-user-circle"></i> Profile</button>
         <button class="dash-tab" onclick="switchTab('notifications',this)"><i class="fas fa-bell"></i> Alerts <span id="notifBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
@@ -100,6 +101,7 @@
       <div class="dash-panel" id="panel-history"><div id="historyList"></div></div>
       <div class="dash-panel" id="panel-install"><div id="installAppArea"></div></div>
       <div class="dash-panel" id="panel-referral"><div id="referralArea"></div></div>
+      <div class="dash-panel" id="panel-savings"><div id="savingsArea"></div></div>
       <div class="dash-panel" id="panel-support"><div id="supportArea"></div></div>
       <div class="dash-panel" id="panel-profile"><div id="profileArea"></div></div>
       <div class="dash-panel" id="panel-notifications"><div id="notifList"></div></div>
@@ -261,6 +263,7 @@
       if (tab === 'history') loadHistory();
       if (tab === 'install') loadInstallApp();
       if (tab === 'referral') loadReferral();
+      if (tab === 'savings') loadSavings();
       if (tab === 'support') loadSupport();
       if (tab === 'profile') loadProfile();
       if (tab === 'notifications') loadNotifications();
@@ -986,6 +989,122 @@
           btn.disabled = false; btn.innerHTML = 'Submit Withdrawal';
         }
       } catch (err) { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = 'Submit Withdrawal'; }
+    }
+
+    async function loadSavings() {
+      const area = document.getElementById('savingsArea');
+      area.innerHTML = '<div style="text-align:center;padding:20px;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+      try {
+        const [plansRes, savingsRes] = await Promise.all([API('/api/savings/plans'), API('/api/savings')]);
+        const plansData = await plansRes.json();
+        const savingsData = await savingsRes.json();
+        const plans = plansData.plans || [];
+        const savings = savingsData.savings || [];
+        const active = savings.filter(s => s.status === 'active');
+        const matured = savings.filter(s => s.status === 'matured');
+        const withdrawn = savings.filter(s => s.status === 'withdrawn');
+        let html = '<div class="vip-detail-card"><h3 style="margin-bottom:20px;"><i class="fas fa-piggy-bank" style="color:var(--primary);margin-right:8px;"></i> Fixed Savings</h3>';
+        html += '<p style="color:var(--text-secondary);margin-bottom:20px;font-size:0.9rem;">Lock your money and earn guaranteed interest. Choose a plan below:</p>';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-bottom:24px;">';
+        plans.forEach(p => {
+          const returns = 1000 + (1000 * p.interestRate / 100);
+          html += `<div class="investment-card" style="cursor:pointer;" onclick="showCreateSavings(${p.id},'${p.name}',${p.durationDays},${p.interestRate})">
+            <div style="font-weight:700;font-size:1rem;margin-bottom:8px;color:var(--primary);">${p.name}</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><i class="fas fa-clock"></i> ${p.durationDays} days lock</div>
+            <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><i class="fas fa-percent"></i> ${p.interestRate}% interest</div>
+            <div style="font-size:0.85rem;color:var(--gold);">₦1,000 → ₦${returns.toLocaleString()}</div>
+          </div>`;
+        });
+        html += '</div>';
+        html += '<div id="createSavingsForm"></div>';
+        if (active.length > 0) {
+          html += '<h3 style="margin:20px 0 12px;"><i class="fas fa-lock" style="color:var(--gold);margin-right:8px;"></i> Active Savings (' + active.length + ')</h3>';
+          active.forEach(s => {
+            const maturesAt = new Date(s.matures_at).getTime();
+            const now = Date.now();
+            const remaining = maturesAt - now;
+            const days = Math.ceil(remaining / (1000 * 60 * 60 * 24));
+            const hours = Math.ceil(remaining / (1000 * 60 * 60));
+            const timeLeft = days > 0 ? days + ' day(s)' : hours + ' hour(s)';
+            html += `<div class="investment-card" style="margin-bottom:12px;">
+              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">₦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">Active</span></div></div>
+              <div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);">
+                <p><i class="fas fa-percent"></i> Interest: ${s.interest_rate}% (₦${Number(s.interest).toLocaleString()})</p>
+                <p><i class="fas fa-coins"></i> Returns: ₦${Number(s.totalReturn).toLocaleString()}</p>
+                <p><i class="fas fa-clock"></i> Matures: ${new Date(s.matures_at).toLocaleDateString()} (${timeLeft} left)</p>
+              </div>
+            </div>`;
+          });
+        }
+        if (matured.length > 0) {
+          html += '<h3 style="margin:20px 0 12px;"><i class="fas fa-check-circle" style="color:#22c55e;margin-right:8px;"></i> Matured (' + matured.length + ')</h3>';
+          matured.forEach(s => {
+            html += `<div class="investment-card" style="margin-bottom:12px;border:1px solid rgba(34,197,94,0.3);">
+              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">₦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">Matured</span></div></div>
+              <div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);">
+                <p><i class="fas fa-coins"></i> Ready to collect: ₦${Number(s.totalReturn).toLocaleString()} (₦${Number(s.amount).toLocaleString()} + ₦${Number(s.interest).toLocaleString()})</p>
+              </div>
+              <button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="withdrawSavings(${s.id})"><i class="fas fa-hand-holding-dollar"></i> Collect Now</button>
+            </div>`;
+          });
+        }
+        if (withdrawn.length > 0) {
+          html += '<h3 style="margin:20px 0 12px;"><i class="fas fa-history" style="color:var(--text-muted);margin-right:8px;"></i> Withdrawn (' + withdrawn.length + ')</h3>';
+          withdrawn.slice(0, 5).forEach(s => {
+            html += `<div class="investment-card" style="margin-bottom:8px;opacity:0.6;">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:0.85rem;">₦${Number(s.amount).toLocaleString()} • ${s.duration_days}d • ${s.interest_rate}%</span>
+                <span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">Collected ₦${Number(s.totalReturn).toLocaleString()}</span>
+              </div>
+            </div>`;
+          });
+        }
+        html += '</div>';
+        area.innerHTML = html;
+      } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load savings</h3></div>'; }
+    }
+
+    function showCreateSavings(planId, name, days, rate) {
+      const area = document.getElementById('createSavingsForm');
+      const interest = (1000 * rate / 100).toFixed(0);
+      area.innerHTML = `<div class="investment-card" style="margin-bottom:16px;border:1px solid var(--primary);">
+        <h4 style="margin-bottom:12px;"><i class="fas fa-piggy-bank" style="color:var(--primary);margin-right:8px;"></i> Create ${name}</h4>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px;">Lock for ${days} days at ${rate}% interest. Minimum ₦1,000.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <input type="number" id="savingsAmount" placeholder="Enter amount (min ₦1,000)" min="1000" style="flex:1;min-width:200px;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+          <button class="btn btn-primary" onclick="createSavings(${planId})"><i class="fas fa-lock"></i> Lock Funds</button>
+          <button class="btn btn-outline" onclick="document.getElementById('createSavingsForm').innerHTML=''">Cancel</button>
+        </div>
+      </div>`;
+    }
+
+    async function createSavings(planId) {
+      const amountInput = document.getElementById('savingsAmount');
+      const amount = parseFloat(amountInput.value);
+      if (!amount || amount < 1000) return showToast('Minimum amount is ₦1,000', 'error');
+      try {
+        const res = await API('/api/savings/create', { method: 'POST', body: JSON.stringify({ planId, amount }) });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          userData.balance = data.balance;
+          document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+          loadSavings();
+        } else { showToast(data.error, 'error'); }
+      } catch (err) { showToast('Network error', 'error'); }
+    }
+
+    async function withdrawSavings(savingsId) {
+      try {
+        const res = await API('/api/savings/withdraw', { method: 'POST', body: JSON.stringify({ savingsId }) });
+        const data = await res.json();
+        if (res.ok) {
+          showToast(data.message, 'success');
+          userData.balance = data.balance;
+          document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
+          loadSavings();
+        } else { showToast(data.error, 'error'); }
+      } catch (err) { showToast('Network error', 'error'); }
     }
 
     async function loadSupport() {

@@ -817,6 +817,7 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('transactions.rejected_at added'); } catch (e) { results.push('transactions.rejected_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
     try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
@@ -977,6 +978,94 @@ app.get('/api/withdrawal-rejections', requireAuth, async (req, res) => {
       return (Date.now() - rejectedAt) < (12 * 60 * 60 * 1000);
     });
     res.json({ rejections });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ===================== SAVINGS =====================
+const DEFAULT_SAVINGS_PLANS = [
+  { id: 1, name: 'Saver 7', durationDays: 7, interestRate: 3 },
+  { id: 2, name: 'Saver 14', durationDays: 14, interestRate: 5 },
+  { id: 3, name: 'Saver 30', durationDays: 30, interestRate: 8 },
+  { id: 4, name: 'Saver 60', durationDays: 60, interestRate: 12 },
+  { id: 5, name: 'Saver 90', durationDays: 90, interestRate: 18 },
+  { id: 6, name: 'Saver 180', durationDays: 180, interestRate: 30 }
+];
+
+app.get('/api/savings/plans', requireAuth, async (req, res) => {
+  res.json({ plans: DEFAULT_SAVINGS_PLANS });
+});
+
+app.get('/api/savings', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('savings', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
+    const savings = (result.data || []).map(s => {
+      const maturesAt = new Date(s.matures_at).getTime();
+      const isMatured = Date.now() >= maturesAt && s.status === 'active';
+      if (isMatured) s.status = 'matured';
+      const interest = (s.amount * s.interest_rate) / 100;
+      s.totalReturn = s.amount + interest;
+      s.interest = interest;
+      return s;
+    });
+    res.json({ savings });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/savings/create', requireAuth, async (req, res) => {
+  try {
+    const { planId, amount } = req.body;
+    if (!planId || !amount || amount <= 0) return res.status(400).json({ error: 'Valid plan and amount required' });
+    const plan = DEFAULT_SAVINGS_PLANS.find(p => p.id === parseInt(planId));
+    if (!plan) return res.status(400).json({ error: 'Invalid savings plan' });
+    if (amount < 1000) return res.status(400).json({ error: 'Minimum savings amount is ₦1,000' });
+    const userRes = await dbQuery('users', 'id, balance', { id: req.userId }, { single: true });
+    if (!userRes.data) return res.status(404).json({ error: 'User not found' });
+    if ((userRes.data.balance || 0) < amount) return res.status(400).json({ error: 'Insufficient wallet balance' });
+    const newBalance = userRes.data.balance - amount;
+    await dbUpdate('users', { balance: newBalance }, { id: req.userId });
+    const maturesAt = new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000).toISOString();
+    await dbInsert('savings', { user_id: req.userId, amount, duration_days: plan.durationDays, interest_rate: plan.interestRate, matures_at: maturesAt, status: 'active' });
+    await dbInsert('notifications', { user_id: req.userId, title: 'Savings Created', message: `You locked ₦${amount.toLocaleString()} in ${plan.name} for ${plan.durationDays} days at ${plan.interestRate}% interest. Matures on ${new Date(maturesAt).toLocaleDateString()}.` });
+    res.json({ success: true, message: 'Savings created successfully', balance: newBalance });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/savings/withdraw', requireAuth, async (req, res) => {
+  try {
+    const { savingsId } = req.body;
+    if (!savingsId) return res.status(400).json({ error: 'Savings ID required' });
+    const result = await dbQuery('savings', '*', { id: parseInt(savingsId), user_id: req.userId }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Savings not found' });
+    const saving = result.data;
+    const maturesAt = new Date(saving.matures_at).getTime();
+    if (Date.now() < maturesAt) return res.status(400).json({ error: 'Savings has not matured yet. Matures on ' + new Date(saving.matures_at).toLocaleDateString() });
+    if (saving.status !== 'active') return res.status(400).json({ error: 'Savings already withdrawn' });
+    const interest = (saving.amount * saving.interest_rate) / 100;
+    const totalReturn = saving.amount + interest;
+    const userRes = await dbQuery('users', 'id, balance', { id: req.userId }, { single: true });
+    const newBalance = (userRes.data.balance || 0) + totalReturn;
+    await dbUpdate('users', { balance: newBalance }, { id: req.userId });
+    await dbUpdate('savings', { status: 'withdrawn' }, { id: parseInt(savingsId) });
+    await dbInsert('notifications', { user_id: req.userId, title: 'Savings Withdrawn', message: `Your savings of ₦${saving.amount.toLocaleString()} has matured! ₦${totalReturn.toLocaleString()} (₦${saving.amount.toLocaleString()} + ₦${interest.toLocaleString()} interest) has been credited to your wallet.` });
+    res.json({ success: true, message: 'Savings withdrawn successfully', balance: newBalance, totalReturn });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/savings', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const result = await dbQuery('savings', '*', {}, { order: { column: 'created_at', ascending: false } });
+    const usersRes = await dbQuery('users', 'id, username, nickname', {});
+    const userMap = {};
+    (usersRes.data || []).forEach(u => { userMap[u.id] = u.nickname || u.username; });
+    const savings = (result.data || []).map(s => {
+      s.displayName = userMap[s.user_id] || 'User #' + s.user_id;
+      const maturesAt = new Date(s.matures_at).getTime();
+      if (Date.now() >= maturesAt && s.status === 'active') s.status = 'matured';
+      s.interest = (s.amount * s.interest_rate) / 100;
+      s.totalReturn = s.amount + s.interest;
+      return s;
+    });
+    res.json({ savings });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
