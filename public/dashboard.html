@@ -43,6 +43,14 @@
         <div id="adminMsgContent" style="color:var(--text-primary);font-size:0.85rem;line-height:1.6;"></div>
       </div>
 
+      <div id="withdrawRejectionBanner" style="display:none;margin-bottom:20px;padding:16px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <i class="fas fa-times-circle" style="color:#ef4444;font-size:1.1rem;"></i>
+          <strong style="color:#ef4444;font-size:0.9rem;">Withdrawal Rejected</strong>
+        </div>
+        <div id="withdrawRejectionContent" style="color:var(--text-primary);font-size:0.85rem;line-height:1.6;"></div>
+      </div>
+
       <div class="dash-stats">
         <div class="dash-stat-card">
           <div class="label"><i class="fas fa-wallet" style="margin-right:6px;"></i> Wallet Balance</div>
@@ -141,6 +149,7 @@
         loadTasks();
         loadNotifications();
         checkAdminMessages();
+        checkWithdrawRejections();
         API('/api/check-refund').then(r => r.json()).then(d => {
           if (d.refundedCount > 0) {
             API('/api/me').then(r => r.json()).then(me => {
@@ -151,6 +160,7 @@
           }
         }).catch(() => {});
         setInterval(checkAdminMessages, 15000);
+        setInterval(checkWithdrawRejections, 15000);
         setInterval(function() {
           API('/api/me').then(r => r.json()).then(d => {
             userData.balance = d.user.balance;
@@ -204,6 +214,21 @@
           banner.style.display = 'block';
         } else {
           badge.style.display = 'none';
+          banner.style.display = 'none';
+        }
+      } catch (e) {}
+    }
+
+    async function checkWithdrawRejections() {
+      try {
+        const res = await API('/api/withdrawal-rejections');
+        const data = await res.json();
+        const rejections = data.rejections || [];
+        const banner = document.getElementById('withdrawRejectionBanner');
+        if (rejections.length > 0) {
+          document.getElementById('withdrawRejectionContent').innerHTML = rejections.map(w => '<div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid #ef4444;"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">' + new Date(w.rejected_at).toLocaleString() + ' — ₦' + Number(w.amount).toLocaleString() + '</div><div>' + (w.admin_note || 'No reason provided') + '</div></div>').join('');
+          banner.style.display = 'block';
+        } else {
           banner.style.display = 'none';
         }
       } catch (e) {}

@@ -667,7 +667,7 @@ app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (r
     const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
-    await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin' }, { id: parseInt(id) });
+    await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin', rejected_at: new Date().toISOString() }, { id: parseInt(id) });
     await dbUpdate('users', { balance: { op: 'increment', val: result.data.amount } }, { id: result.data.user_id });
 
     const userRes = await dbQuery('users', 'balance', { id: result.data.user_id }, { single: true });
@@ -816,6 +816,7 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\'' }); results.push('users.avatar_url added'); } catch (e) { results.push('users.avatar_url: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('transactions.rejected_at added'); } catch (e) { results.push('transactions.rejected_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.from('transactions').delete().neq('id', 0); results.push('transactions cleared'); } catch (e) { results.push('clear transactions: ' + e.message); }
     try { await sb.from('withdrawals').delete().neq('id', 0); results.push('withdrawals cleared'); } catch (e) { results.push('clear withdrawals: ' + e.message); }
@@ -964,6 +965,18 @@ app.get('/api/check-refund', requireAuth, async (req, res) => {
       }
     }
     res.json({ refundedCount, totalRefunded });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/withdrawal-rejections', requireAuth, async (req, res) => {
+  try {
+    const result = await dbQuery('withdrawals', 'id, amount, admin_note, rejected_at, status', { user_id: req.userId, status: 'rejected' }, { order: { column: 'created_at', ascending: false } });
+    const rejections = (result.data || []).filter(w => {
+      if (!w.rejected_at) return false;
+      const rejectedAt = new Date(w.rejected_at).getTime();
+      return (Date.now() - rejectedAt) < (12 * 60 * 60 * 1000);
+    });
+    res.json({ rejections });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
