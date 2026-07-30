@@ -17,15 +17,15 @@ const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.10');
 const monnifyConfigured = MONNIFY_API_KEY && MONNIFY_SECRET;
 
 const VIP_PLANS = {
-  1: { amount: 3000, dailyReturn: 200, withdrawalDay: 'Tuesday' },
-  2: { amount: 9000, dailyReturn: 400, withdrawalDay: 'Tuesday' },
-  3: { amount: 27000, dailyReturn: 800, withdrawalDay: 'Tuesday' },
-  4: { amount: 54000, dailyReturn: 1600, withdrawalDay: 'Wednesday' },
-  5: { amount: 81000, dailyReturn: 3200, withdrawalDay: 'Wednesday' },
-  6: { amount: 120000, dailyReturn: 6400, withdrawalDay: 'Thursday' },
-  7: { amount: 200000, dailyReturn: 12800, withdrawalDay: 'Thursday' },
-  8: { amount: 230000, dailyReturn: 25600, withdrawalDay: 'Friday' },
-  9: { amount: 280000, dailyReturn: 51200, withdrawalDay: 'Friday' }
+  1: { amount: 3000, dailyReturn: 150, withdrawalDay: 'Tuesday' },
+  2: { amount: 9000, dailyReturn: 450, withdrawalDay: 'Tuesday' },
+  3: { amount: 27000, dailyReturn: 1350, withdrawalDay: 'Tuesday' },
+  4: { amount: 54000, dailyReturn: 2700, withdrawalDay: 'Wednesday' },
+  5: { amount: 81000, dailyReturn: 4050, withdrawalDay: 'Wednesday' },
+  6: { amount: 120000, dailyReturn: 6000, withdrawalDay: 'Thursday' },
+  7: { amount: 200000, dailyReturn: 10000, withdrawalDay: 'Thursday' },
+  8: { amount: 230000, dailyReturn: 11500, withdrawalDay: 'Friday' },
+  9: { amount: 280000, dailyReturn: 14000, withdrawalDay: 'Friday' }
 };
 
 app.use(express.json());
@@ -819,15 +819,15 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 200 WHERE vip_level = 1 AND status = 'active'" }); results.push('VIP 1 daily_return updated to 200'); } catch (e) { results.push('VIP 1 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 400 WHERE vip_level = 2 AND status = 'active'" }); results.push('VIP 2 daily_return updated to 400'); } catch (e) { results.push('VIP 2 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 800 WHERE vip_level = 3 AND status = 'active'" }); results.push('VIP 3 daily_return updated to 800'); } catch (e) { results.push('VIP 3 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 1600 WHERE vip_level = 4 AND status = 'active'" }); results.push('VIP 4 daily_return updated to 1600'); } catch (e) { results.push('VIP 4 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 3200 WHERE vip_level = 5 AND status = 'active'" }); results.push('VIP 5 daily_return updated to 3200'); } catch (e) { results.push('VIP 5 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 6400 WHERE vip_level = 6 AND status = 'active'" }); results.push('VIP 6 daily_return updated to 6400'); } catch (e) { results.push('VIP 6 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 12800 WHERE vip_level = 7 AND status = 'active'" }); results.push('VIP 7 daily_return updated to 12800'); } catch (e) { results.push('VIP 7 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 25600 WHERE vip_level = 8 AND status = 'active'" }); results.push('VIP 8 daily_return updated to 25600'); } catch (e) { results.push('VIP 8 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 51200 WHERE vip_level = 9 AND status = 'active'" }); results.push('VIP 9 daily_return updated to 51200'); } catch (e) { results.push('VIP 9 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 150 WHERE vip_level = 1 AND status = 'active'" }); results.push('VIP 1 daily_return updated to 150'); } catch (e) { results.push('VIP 1 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 450 WHERE vip_level = 2 AND status = 'active'" }); results.push('VIP 2 daily_return updated to 450'); } catch (e) { results.push('VIP 2 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 1350 WHERE vip_level = 3 AND status = 'active'" }); results.push('VIP 3 daily_return updated to 1350'); } catch (e) { results.push('VIP 3 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 2700 WHERE vip_level = 4 AND status = 'active'" }); results.push('VIP 4 daily_return updated to 2700'); } catch (e) { results.push('VIP 4 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 4050 WHERE vip_level = 5 AND status = 'active'" }); results.push('VIP 5 daily_return updated to 4050'); } catch (e) { results.push('VIP 5 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 6000 WHERE vip_level = 6 AND status = 'active'" }); results.push('VIP 6 daily_return updated to 6000'); } catch (e) { results.push('VIP 6 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 10000 WHERE vip_level = 7 AND status = 'active'" }); results.push('VIP 7 daily_return updated to 10000'); } catch (e) { results.push('VIP 7 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 11500 WHERE vip_level = 8 AND status = 'active'" }); results.push('VIP 8 daily_return updated to 11500'); } catch (e) { results.push('VIP 8 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 14000 WHERE vip_level = 9 AND status = 'active'" }); results.push('VIP 9 daily_return updated to 14000'); } catch (e) { results.push('VIP 9 update: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
