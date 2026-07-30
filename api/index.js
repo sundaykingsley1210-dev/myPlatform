@@ -324,8 +324,8 @@ app.get('/api/task-status', requireAuth, (req, res) => {
   const now = new Date();
   const ng = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
   const day = ng.getDay(), h = ng.getHours(), m = ng.getMinutes(), t = h * 60 + m;
-  const isWeekday = day >= 1 && day <= 5, isTaskTime = t >= 600 && t < 1020;
-  res.json({ canClaim: isWeekday && isTaskTime, nigeriaTime: ng.toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }), message: !isWeekday ? 'Tasks are only available Monday to Friday.' : !isTaskTime ? 'Tasks are available between 10:00 AM and 6:00 PM. No task yet.' : 'Tasks are active! Collect your daily returns.' });
+  const isWeekday = day >= 2 && day <= 5, isTaskTime = t >= 600 && t < 1020;
+  res.json({ canClaim: isWeekday && isTaskTime, nigeriaTime: ng.toLocaleString('en-NG', { timeZone: 'Africa/Lagos' }), message: !isWeekday ? 'Tasks are only available Tuesday to Friday.' : !isTaskTime ? 'Tasks are available between 10:00 AM and 6:00 PM. No task yet.' : 'Tasks are active! Collect your daily returns.' });
 });
 
 app.post('/api/claim-task', requireAuth, async (req, res) => {
@@ -333,7 +333,7 @@ app.post('/api/claim-task', requireAuth, async (req, res) => {
   const now = new Date();
   const ng = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Lagos' }));
   const day = ng.getDay(), h = ng.getHours(), m = ng.getMinutes(), t = h * 60 + m;
-  if (!(day >= 1 && day <= 5) || !(t >= 600 && t < 1020)) return res.status(400).json({ error: 'Tasks are only available Monday to Friday, 10:00 AM - 6:00 PM.' });
+  if (!(day >= 2 && day <= 5) || !(t >= 600 && t < 1020)) return res.status(400).json({ error: 'Tasks are only available Tuesday to Friday, 10:00 AM - 6:00 PM.' });
 
   try {
     const invResult = await dbQuery('investments', 'id, vip_level, daily_return, status, total_collected, days_collected', { id: investmentId, user_id: req.userId }, { single: true });
@@ -820,6 +820,25 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/restore-investments', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const plans = { 1: { amount: 3000, dailyReturn: 250 }, 2: { amount: 5000, dailyReturn: 500 }, 3: { amount: 10000, dailyReturn: 1000 }, 4: { amount: 20000, dailyReturn: 2000 }, 5: { amount: 50000, dailyReturn: 5000 }, 6: { amount: 100000, dailyReturn: 10000 }, 7: { amount: 150000, dailyReturn: 15000 }, 8: { amount: 200000, dailyReturn: 20000 }, 9: { amount: 280000, dailyReturn: 28000 } };
+    const usersRes = await dbQuery('users', 'id, vip_level', { vip_level: { op: 'gt', val: 0 } });
+    const users = usersRes.data || [];
+    let count = 0;
+    for (const u of users) {
+      const existing = await dbQuery('investments', 'id', { user_id: u.id, status: 'active' });
+      if (existing.data && existing.data.length > 0) continue;
+      const plan = plans[u.vip_level];
+      if (!plan) continue;
+      const ref = 'RESTORE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+      await dbInsert('investments', { user_id: u.id, vip_level: u.vip_level, amount: plan.amount, status: 'active', reference: ref, daily_return: plan.dailyReturn, total_collected: 0, days_collected: 0 });
+      count++;
+    }
+    res.json({ success: true, message: count + ' investments restored', count });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

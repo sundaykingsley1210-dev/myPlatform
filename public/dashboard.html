@@ -611,7 +611,7 @@
         </div>`;
 
         if (!canClaim) {
-          html += `<div class="empty-state"><i class="fas fa-clock"></i><h3>No Tasks Available</h3><p>Tasks are active Monday - Friday, 10:00 AM - 6:00 PM (Nigeria time)</p></div>`;
+          html += `<div class="empty-state"><i class="fas fa-clock"></i><h3>No Tasks Available</h3><p>Tasks are active Tuesday - Friday, 10:00 AM - 6:00 PM (Nigeria time)</p></div>`;
         } else if (!activeInvs.length) {
           html += `<div class="empty-state"><i class="fas fa-clipboard-check"></i><h3>No Active Investments</h3><p>Invest in a VIP plan to start earning daily returns</p><br><button class="btn btn-primary" onclick="document.querySelectorAll('.dash-tab')[2].click();"><i class="fas fa-plus-circle"></i> Start Investing</button></div>`;
         } else {
