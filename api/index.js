@@ -823,25 +823,6 @@ app.get('/api/migrate', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.get('/api/restore-investments', requireAuth, requireAdmin, async (req, res) => {
-  try {
-    const plans = { 1: { amount: 3000, dailyReturn: 250 }, 2: { amount: 5000, dailyReturn: 500 }, 3: { amount: 10000, dailyReturn: 1000 }, 4: { amount: 20000, dailyReturn: 2000 }, 5: { amount: 50000, dailyReturn: 5000 }, 6: { amount: 100000, dailyReturn: 10000 }, 7: { amount: 150000, dailyReturn: 15000 }, 8: { amount: 200000, dailyReturn: 20000 }, 9: { amount: 280000, dailyReturn: 28000 } };
-    const usersRes = await dbQuery('users', 'id, vip_level', { vip_level: { op: 'gt', val: 0 } });
-    const users = usersRes.data || [];
-    let count = 0;
-    for (const u of users) {
-      const existing = await dbQuery('investments', 'id', { user_id: u.id, status: 'active' });
-      if (existing.data && existing.data.length > 0) continue;
-      const plan = plans[u.vip_level];
-      if (!plan) continue;
-      const ref = 'RESTORE-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-      await dbInsert('investments', { user_id: u.id, vip_level: u.vip_level, amount: plan.amount, status: 'active', reference: ref, daily_return: plan.dailyReturn, total_collected: 0, days_collected: 0 });
-      count++;
-    }
-    res.json({ success: true, message: count + ' investments restored', count });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 // ===================== PROFILE SETTINGS =====================
 app.get('/api/profile', requireAuth, async (req, res) => {
   try {
