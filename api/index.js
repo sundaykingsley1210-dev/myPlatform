@@ -1133,6 +1133,37 @@ app.post('/api/messages', requireAuth, async (req, res) => {
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
   try {
     await dbInsert('messages', { user_id: req.userId, sender: 'user', message: message.trim() });
+
+    // Auto-reply system
+    const userMsgs = await dbQuery('messages', 'id', { user_id: req.userId, sender: 'user' });
+    const msgCount = (userMsgs.data || []).length;
+    const msgLower = message.trim().toLowerCase();
+
+    let autoReply = null;
+    if (msgCount === 1) {
+      autoReply = 'Hello! Welcome to Enrich U Support. How can we help you today? Please describe your issue and we will get back to you shortly.';
+    } else if (msgLower.includes('withdraw') && !msgLower.includes('withdrawn')) {
+      autoReply = 'Thank you for reaching out about your withdrawal. Our team is reviewing it. Please wait patiently for the admin response.';
+    } else if (msgLower.includes('payment') || msgLower.includes('pay') || msgLower.includes('invest')) {
+      autoReply = 'Thank you for your message regarding payment/investment. Our team will look into this. Please wait patiently for the admin response.';
+    } else if (msgLower.includes('vip') || msgLower.includes('plan')) {
+      autoReply = 'Thank you for your VIP inquiry. Our team will attend to you shortly. Please wait patiently for the admin response.';
+    } else if (msgLower.includes('task') || msgLower.includes('daily') || msgLower.includes('collect')) {
+      autoReply = 'Thank you for your message about tasks/daily returns. Our team will review this. Please wait patiently for the admin response.';
+    } else if (msgLower.includes('password') || msgLower.includes('login') || msgLower.includes('account')) {
+      autoReply = 'Thank you for contacting us about your account. Our team will assist you shortly. Please wait patiently for the admin response.';
+    } else if (msgLower.includes('bonus') || msgLower.includes('referral')) {
+      autoReply = 'Thank you for your referral/bonus inquiry. Our team will look into this. Please wait patiently for the admin response.';
+    } else if (msgCount >= 3) {
+      autoReply = 'Thank you for providing the details. Your complaint has been received and logged. Please wait patiently for the admin response. We appreciate your patience.';
+    } else {
+      autoReply = 'Thank you for your message. We have received your complaint. Could you please provide more details so we can assist you better? The admin will respond shortly.';
+    }
+
+    if (autoReply) {
+      await dbInsert('messages', { user_id: req.userId, sender: 'admin', message: autoReply });
+    }
+
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
