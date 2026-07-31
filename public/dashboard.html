@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/style.css?v=14">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://js.paystack.co/v1/inline.js"></script>
 </head>
 <body>
   <nav class="navbar">
@@ -380,7 +381,7 @@
     let paymentExpiresAt = null;
 
     async function createInvestment(level) {
-      const btn = document.getElementById('investBtn');
+      const btn = await document.getElementById('investBtn');
       btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Generating payment details...';
       try {
         const res = await API('/api/create-investment', { method: 'POST', body: JSON.stringify({ vipLevel: level }) });
@@ -388,6 +389,58 @@
         if (res.ok) {
           const pd = data.paymentDetails;
           paymentExpiresAt = Date.now() + (20 * 60 * 1000);
+
+          if (pd.paystack && pd.access_code) {
+            const handler = PaystackPop.setup({
+              key: pd.paystackKey,
+              email: (pd.accountName || 'user@enrichu.com').replace('EnrichU-', '') + '@enrichu.com',
+              amount: pd.amount * 100,
+              currency: 'NGN',
+              ref: pd.reference,
+              onSuccess: function(transaction) {
+                showToast('Payment successful! Verifying...', 'success');
+                verifyPayment(pd.reference);
+              },
+              onClose: function() {
+                showToast('Payment cancelled', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
+                document.getElementById('generatedPayment').innerHTML = '';
+              }
+            });
+            handler.openIframe();
+            document.getElementById('generatedPayment').innerHTML = `
+              <div class="payment-generated-box">
+                <div class="alert alert-success"><i class="fas fa-check-circle"></i> Complete payment in the popup window</div>
+                <div class="payment-amount-box">
+                  <div class="payment-amount-label">Amount to Pay</div>
+                  <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
+                </div>
+                <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.75rem;word-break:break-all;">${pd.reference}</span></div>
+                <div class="payment-countdown" id="paymentCountdown">
+                  <div class="countdown-header"><i class="fas fa-hourglass-half"></i> Time Remaining</div>
+                  <div class="countdown-display" id="countdownDisplay">20:00</div>
+                  <div class="payment-timer-bar"><div class="payment-timer-fill" id="timerFill"></div></div>
+                </div>
+                <div id="expiredMsg" style="display:none;padding:16px;background:rgba(239,68,68,0.08);border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.2);text-align:center;margin-top:12px;">
+                  <i class="fas fa-exclamation-triangle" style="color:#ef4444;font-size:1.5rem;"></i>
+                  <p style="font-weight:700;color:#ef4444;margin:8px 0;">Payment Session Expired</p>
+                </div>
+                <div style="margin-top:16px;text-align:center;display:flex;flex-direction:column;gap:10px;">
+                  <button class="btn btn-accent btn-lg" onclick="verifyPayment('${pd.reference}')" id="verifyBtn" style="width:100%;">
+                    <i class="fas fa-check-double"></i> I've Made Payment
+                  </button>
+                  <button class="btn btn-outline" onclick="cancelInvestment()" id="cancelPayBtn" style="width:100%;">
+                    <i class="fas fa-times"></i> Cancel
+                  </button>
+                </div>
+              </div>`;
+            btn.style.display = 'none';
+            startCountdown();
+            startAutoVerify(pd.reference);
+            return;
+          }
+
           document.getElementById('generatedPayment').innerHTML = `
             <div class="payment-generated-box">
               <div class="alert alert-success"><i class="fas fa-check-circle"></i> Transfer exactly the amount below to this account</div>

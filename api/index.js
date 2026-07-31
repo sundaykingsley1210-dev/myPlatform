@@ -7,14 +7,12 @@ const { initDatabase, dbQuery, dbInsert, dbUpdate, isSupabase } = require('../da
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'enrich-u-jwt-secret-2026';
-const MONNIFY_API_KEY = process.env.MONNIFY_API_KEY || '';
-const MONNIFY_SECRET = process.env.MONNIFY_SECRET || '';
-const MONNIFY_CONTRACT_CODE = process.env.MONNIFY_CONTRACT_CODE || '';
-const MONNIFY_BASE_URL = process.env.MONNIFY_BASE_URL || 'https://api.monnify.com';
+const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY || '';
+const PAYSTACK_PUBLIC = process.env.PAYSTACK_PUBLIC_KEY || '';
 const SITE_URL = process.env.SITE_URL || 'https://myplatform-seven.vercel.app';
 const VAT_RATE = parseFloat(process.env.VAT_RATE || '0.10');
 
-const monnifyConfigured = MONNIFY_API_KEY && MONNIFY_SECRET;
+const paystackConfigured = PAYSTACK_SECRET.length > 0;
 
 const VIP_PLANS = {
   1: { amount: 3000, dailyReturn: 150, withdrawalDay: 'Tuesday' },
@@ -242,20 +240,19 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     let accountDetails = null;
 
-    if (monnifyConfigured) {
+    if (paystackConfigured) {
       try {
-        const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
-          headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
-        });
-        if (tokenRes.data?.responseBody?.accessToken) {
-          const accRes = await axios.post(`${MONNIFY_BASE_URL}/api/v2/BankTransfer/ReserveAccount`, {
-            accountReference: ref, accountName: `EnrichU-${req.username}`, currencyCode: 'NGN',
-            contractCode: MONNIFY_CONTRACT_CODE || MONNIFY_API_KEY, customerEmail: `${req.username}@enrichu.com`,
-            customerName: req.username, bvn: '00000000000', redirectUrl: `${SITE_URL}/dashboard.html`
-          }, { headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}`, 'Content-Type': 'application/json' } });
-          if (accRes.data?.responseBody) accountDetails = accRes.data.responseBody;
+        const psRes = await axios.post('https://api.paystack.co/transaction/initialize', {
+          amount: plan.amount * 100,
+          email: `${req.username}@enrichu.com`,
+          reference: ref,
+          callback_url: `${SITE_URL}/dashboard.html`,
+          metadata: { vipLevel: parseInt(vipLevel), userId: req.userId }
+        }, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, 'Content-Type': 'application/json' } });
+        if (psRes.data?.status) {
+          accountDetails = { authorization_url: psRes.data.data.authorization_url, access_code: psRes.data.data.access_code, reference: ref };
         }
-      } catch (e) { console.log('Monnify API error:', e.message); }
+      } catch (e) { console.log('Paystack init error:', e.message); }
     }
 
     if (!accountDetails) {
@@ -267,9 +264,9 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
       };
     }
 
-    await dbInsert('transactions', { user_id: req.userId, type: 'investment', vip_level: parseInt(vipLevel), amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || accountDetails.bank_name || 'Bank', account_number: accountDetails.accountNumber || accountDetails.account_number || '0000000000', account_name: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}` });
+    await dbInsert('transactions', { user_id: req.userId, type: 'investment', vip_level: parseInt(vipLevel), amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || 'Paystack', account_number: accountDetails.accountNumber || '0000000000', account_name: accountDetails.accountName || `EnrichU-${req.username}` });
 
-    res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, bankName: accountDetails.bankName || accountDetails.bank_name || 'Bank', accountNumber: accountDetails.accountNumber || accountDetails.account_number || '0000000000', accountName: accountDetails.accountName || accountDetails.account_name || `EnrichU-${req.username}`, vipLevel } });
+    res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, bankName: accountDetails.bankName || 'Paystack', accountNumber: accountDetails.accountNumber || '0000000000', accountName: accountDetails.accountName || `EnrichU-${req.username}`, vipLevel, authorization_url: accountDetails.authorization_url || null, access_code: accountDetails.access_code || null, paystack: paystackConfigured, paystackKey: PAYSTACK_PUBLIC } });
   } catch (err) { res.status(500).json({ error: 'Failed: ' + err.message }); }
 });
 
@@ -283,27 +280,22 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
     if (tx.status === 'completed') return res.json({ success: true, message: 'Payment already verified and approved' });
     if (tx.status === 'pending_approval') return res.json({ success: true, message: 'Payment confirmed! Waiting for admin approval.', status: 'pending_approval' });
 
-    // Confirm payment via Monnify
+    // Confirm payment via Paystack
     let paymentConfirmed = false;
-    if (monnifyConfigured) {
+    if (paystackConfigured) {
       try {
-        const tokenRes = await axios.post(`${MONNIFY_BASE_URL}/api/v1/auth/login`, {}, {
-          headers: { 'Authorization': `Basic ${Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET}`).toString('base64')}`, 'Content-Type': 'application/json' }
+        const psRes = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+          headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
         });
-        if (tokenRes.data?.responseBody?.accessToken) {
-          const txRes = await axios.get(`${MONNIFY_BASE_URL}/api/v2/transactions/${reference}`, {
-            headers: { 'Authorization': `Bearer ${tokenRes.data.responseBody.accessToken}` }
-          });
-          if (txRes.data?.responseBody?.paymentStatus === 'PAID') paymentConfirmed = true;
-        }
-      } catch (e) { console.log('Monnify verify error:', e.message); }
+        if (psRes.data?.status && psRes.data?.data?.status === 'success') paymentConfirmed = true;
+      } catch (e) { console.log('Paystack verify error:', e.message); }
     }
 
     if (!paymentConfirmed) {
-      return res.status(400).json({ error: 'Payment not yet confirmed. Please wait a few minutes after transfer and try again.' });
+      return res.status(400).json({ error: 'Payment not yet confirmed. Please wait a few minutes after payment and try again.' });
     }
 
-    // Payment confirmed by Monnify — mark as pending admin approval
+    // Payment confirmed by Paystack — mark as pending admin approval
     await dbUpdate('transactions', { status: 'pending_approval' }, { id: tx.id });
     await dbInsert('notifications', { user_id: req.userId, title: 'Payment Confirmed', message: `Your payment of ₦${tx.amount.toLocaleString()} for VIP ${tx.vip_level} has been confirmed and is awaiting admin approval.` });
 
@@ -792,7 +784,7 @@ app.get('/api/setup-columns', async (req, res) => {
 
 app.get('/api/config-status', (req, res) => {
   res.json({
-    monnify: monnifyConfigured ? 'configured' : 'not configured',
+    paystack: paystackConfigured ? 'configured' : 'not configured',
     vatRate: (VAT_RATE * 100) + '%',
     siteUrl: SITE_URL,
     monnifyUrl: MONNIFY_BASE_URL
