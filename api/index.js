@@ -1026,7 +1026,7 @@ app.get('/api/withdrawal-rejections', requireAuth, async (req, res) => {
     const rejections = (result.data || []).filter(w => {
       if (!w.rejected_at) return false;
       const rejectedAt = new Date(w.rejected_at).getTime();
-      return (Date.now() - rejectedAt) < (12 * 60 * 60 * 1000);
+      return (Date.now() - rejectedAt) < (6 * 60 * 60 * 1000);
     });
     res.json({ rejections });
   } catch (err) { res.status(500).json({ error: err.message }); }

@@ -228,8 +228,8 @@
         const data = await res.json();
         const msgs = data.messages || [];
         const now = Date.now();
-        const twelveHrs = 12 * 60 * 60 * 1000;
-        const recentAdminMsgs = msgs.filter(m => m.sender === 'admin' && (now - new Date(m.created_at).getTime()) < twelveHrs);
+        const sixHrs = 6 * 60 * 60 * 1000;
+        const recentAdminMsgs = msgs.filter(m => m.sender === 'admin' && (now - new Date(m.created_at).getTime()) < sixHrs);
         const badge = document.getElementById('msgBadge');
         const banner = document.getElementById('adminMsgBanner');
         if (recentAdminMsgs.length > 0) {
