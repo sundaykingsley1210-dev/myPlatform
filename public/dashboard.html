@@ -111,6 +111,27 @@
 
   <div id="toastContainer"></div>
 
+  <div id="liveChatWidget">
+    <div id="chatWidgetBubble" onclick="toggleChatWidget()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#0040cc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,87,255,0.4);z-index:9999;transition:transform 0.2s;">
+      <i class="fas fa-comments"></i>
+      <span id="chatUnreadBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:0.65rem;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 4px;"></span>
+    </div>
+    <div id="chatWidgetBox" style="display:none;position:fixed;bottom:90px;right:24px;width:340px;max-width:calc(100vw - 48px);height:460px;max-height:calc(100vh - 140px);background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.3);z-index:9999;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="padding:14px 16px;background:linear-gradient(135deg,var(--primary),#0040cc);color:#fff;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <i class="fas fa-headset"></i>
+          <strong style="font-size:0.95rem;">Support Chat</strong>
+        </div>
+        <div onclick="toggleChatWidget()" style="cursor:pointer;font-size:1.1rem;opacity:0.8;"><i class="fas fa-times"></i></div>
+      </div>
+      <div id="chatWidgetMessages" style="flex:1;overflow-y:auto;padding:12px;min-height:0;"></div>
+      <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;">
+        <input type="text" id="chatWidgetInput" placeholder="Type a message..." style="flex:1;padding:10px 12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:20px;color:var(--text-primary);font-size:0.85rem;outline:none;" onkeypress="if(event.key==='Enter')sendChatWidget()">
+        <button onclick="sendChatWidget()" style="width:38px;height:38px;border-radius:50%;background:var(--primary);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.9rem;"><i class="fas fa-paper-plane"></i></button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API = (url, opts = {}) => {
       const token = localStorage.getItem('token');
@@ -164,6 +185,8 @@
         }).catch(() => {});
         setInterval(checkAdminMessages, 15000);
         setInterval(checkWithdrawRejections, 15000);
+        setInterval(loadChatWidget, 10000);
+        loadChatWidget();
         setInterval(function() {
           API('/api/me').then(r => r.json()).then(d => {
             userData.balance = d.user.balance;
@@ -1193,6 +1216,58 @@
       try {
         await API('/api/messages', { method: 'POST', body: JSON.stringify({ message: msg }) });
         loadChatMessages();
+      } catch (err) { showToast('Failed to send', 'error'); }
+    }
+
+    let chatWidgetOpen = false;
+    let chatWidgetPoll = null;
+    let chatWidgetLastCount = 0;
+
+    function toggleChatWidget() {
+      const box = document.getElementById('chatWidgetBox');
+      chatWidgetOpen = !chatWidgetOpen;
+      if (chatWidgetOpen) {
+        box.style.display = 'flex';
+        document.getElementById('chatWidgetBubble').style.transform = 'scale(0.9)';
+        loadChatWidget();
+        chatWidgetPoll = setInterval(loadChatWidget, 5000);
+      } else {
+        box.style.display = 'none';
+        document.getElementById('chatWidgetBubble').style.transform = 'scale(1)';
+        if (chatWidgetPoll) { clearInterval(chatWidgetPoll); chatWidgetPoll = null; }
+      }
+    }
+
+    async function loadChatWidget() {
+      try {
+        const res = await API('/api/messages');
+        const data = await res.json();
+        const msgs = data.messages || [];
+        const box = document.getElementById('chatWidgetMessages');
+        if (!box) return;
+        const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
+        box.innerHTML = msgs.length ? msgs.map(m => '<div style="margin-bottom:10px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div style="display:inline-block;padding:8px 12px;border-radius:12px;max-width:85%;background:' + (m.sender === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.08)') + ';color:' + (m.sender === 'user' ? '#fff' : 'var(--text-primary)') + ';font-size:0.85rem;line-height:1.4;">' + m.message + '</div><div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</div></div>').join('') : '<p style="color:var(--text-muted);text-align:center;padding:40px 10px;font-size:0.85rem;">Send a message to start chatting with support.</p>';
+        if (wasAtBottom) box.scrollTop = box.scrollHeight;
+        const adminMsgs = msgs.filter(m => m.sender === 'admin');
+        const badge = document.getElementById('chatUnreadBadge');
+        if (adminMsgs.length > chatWidgetLastCount && !chatWidgetOpen) {
+          badge.textContent = adminMsgs.length;
+          badge.style.display = 'flex';
+        } else if (chatWidgetOpen) {
+          badge.style.display = 'none';
+        }
+        chatWidgetLastCount = adminMsgs.length;
+      } catch (e) {}
+    }
+
+    async function sendChatWidget() {
+      const input = document.getElementById('chatWidgetInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      try {
+        await API('/api/messages', { method: 'POST', body: JSON.stringify({ message: msg }) });
+        loadChatWidget();
       } catch (err) { showToast('Failed to send', 'error'); }
     }
 
