@@ -1,138 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="theme-color" content="#f0f2f5">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
-  <title>Dashboard - Enrich U</title>
-  <link rel="stylesheet" href="/css/style.css?v=16">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <script src="https://js.paystack.co/v1/inline.js"></script>
-</head>
-<body>
-  <nav class="navbar">
-    <div class="nav-container">
-      <a href="/" class="logo"><i class="fas fa-gem"></i> Enrich <span>U</span></a>
-      <div class="nav-actions">
-        <span id="userGreeting" style="color:var(--text-secondary);font-size:0.9rem;margin-right:8px;display:flex;align-items:center;gap:6px;"></span>
-        <a href="/admin.html" class="btn btn-outline" id="adminLink" style="display:none;"><i class="fas fa-shield-halved"></i> Admin</a>
-        <a href="#" class="btn btn-outline" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</a>
-      </div>
-    </div>
-  </nav>
-
-  <div class="dashboard-page">
-    <div class="container">
-      <div class="dashboard-header">
-        <h1 id="dashTitle">Welcome back!</h1>
-        <p>Manage your investments and collect your daily returns</p>
-      </div>
-      <div id="adminMsgBanner" style="display:none;margin-bottom:20px;padding:16px;background:linear-gradient(135deg,rgba(0,87,255,0.1),rgba(0,87,255,0.05));border:1px solid rgba(0,87,255,0.2);border-radius:var(--radius-sm);">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <i class="fas fa-envelope" style="color:var(--primary);font-size:1.1rem;"></i>
-          <strong style="color:var(--primary);font-size:0.9rem;">Message from Admin</strong>
-          <span id="adminMsgTime" style="font-size:0.7rem;color:var(--text-muted);margin-left:auto;"></span>
-        </div>
-        <div id="adminMsgContent" style="color:var(--text-primary);font-size:0.85rem;line-height:1.6;"></div>
-      </div>
-
-      <div id="withdrawRejectionBanner" style="display:none;margin-bottom:20px;padding:16px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-sm);">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <i class="fas fa-times-circle" style="color:#ef4444;font-size:1.1rem;"></i>
-          <strong style="color:#ef4444;font-size:0.9rem;">Withdrawal Rejected</strong>
-        </div>
-        <div id="withdrawRejectionContent" style="color:var(--text-primary);font-size:0.85rem;line-height:1.6;"></div>
-      </div>
-
-      <div class="dash-stats">
-        <div class="dash-stat-card">
-          <div class="label"><i class="fas fa-wallet" style="margin-right:6px;"></i> Wallet Balance</div>
-          <div class="value primary" id="balanceVal">₦0.00</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="label"><i class="fas fa-chart-line" style="margin-right:6px;"></i> Total Earned</div>
-          <div class="value accent" id="totalEarnedVal">₦0.00</div>
-        </div>
-        <div class="dash-stat-card">
-          <div class="label"><i class="fas fa-crown" style="margin-right:6px;"></i> My VIP Level</div>
-          <div class="value gold" id="myVipLevel">None</div>
-        </div>
-      </div>
-
-      <div class="dash-tabs">
-        <button class="dash-tab active" onclick="switchTab('tasks',this)"><i class="fas fa-list-check"></i> Daily Tasks</button>
-        <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
-        <button class="dash-tab" onclick="switchTab('new-invest',this)"><i class="fas fa-plus-circle"></i> New Investment</button>
-        <button class="dash-tab" onclick="switchTab('withdraw',this)"><i class="fas fa-money-bill-wave"></i> Withdraw</button>
-        <button class="dash-tab" onclick="switchTab('history',this)"><i class="fas fa-history"></i> History</button>
-        <button class="dash-tab" onclick="switchTab('install',this)"><i class="fas fa-download"></i> Install App</button>
-        <button class="dash-tab" onclick="switchTab('referral',this)"><i class="fas fa-users"></i> Referral</button>
-        <button class="dash-tab" onclick="switchTab('savings',this)"><i class="fas fa-piggy-bank"></i> Savings</button>
-        <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support <span id="msgBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
-        <button class="dash-tab" onclick="switchTab('profile',this)"><i class="fas fa-user-circle"></i> Profile</button>
-        <button class="dash-tab" onclick="switchTab('notifications',this)"><i class="fas fa-bell"></i> Alerts <span id="notifBadge" style="display:none;background:#ef4444;color:#fff;padding:2px 6px;border-radius:10px;font-size:0.7rem;margin-left:4px;"></span></button>
-      </div>
-
-      <div class="dash-panel active" id="panel-tasks">
-        <div id="tasksArea"></div>
-      </div>
-      <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
-      <div class="dash-panel" id="panel-new-invest">
-        <div id="vipPlanSelector">
-          <h3 style="margin-bottom:20px;"><i class="fas fa-crown" style="color:var(--gold);margin-right:8px;"></i> Select a VIP Plan</h3>
-          <div class="vip-select-grid" id="vipSelectGrid"></div>
-        </div>
-        <div id="paymentArea" style="display:none;"></div>
-      </div>
-      <div class="dash-panel" id="panel-withdraw">
-        <div id="withdrawInfo" style="margin-bottom:20px;padding:16px;background:var(--bg-card);border-radius:var(--radius-sm);border:1px solid var(--border);"></div>
-        <div id="withdrawForm"></div>
-        <div style="margin-top:24px;">
-          <div id="withdrawHistory"></div>
-        </div>
-      </div>
-      <div class="dash-panel" id="panel-history"><div id="historyList"></div></div>
-      <div class="dash-panel" id="panel-install"><div id="installAppArea"></div></div>
-      <div class="dash-panel" id="panel-referral"><div id="referralArea"></div></div>
-      <div class="dash-panel" id="panel-savings"><div id="savingsArea"></div></div>
-      <div class="dash-panel" id="panel-support"><div id="supportArea"></div></div>
-      <div class="dash-panel" id="panel-profile"><div id="profileArea"></div></div>
-      <div class="dash-panel" id="panel-notifications"><div id="notifList"></div></div>
-    </div>
-  </div>
-
-  <div id="toastContainer"></div>
-
-  <div id="liveChatWidget">
-    <div id="chatWidgetBubble" onclick="toggleChatWidget()" style="position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#0040cc);color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.4rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,87,255,0.4);z-index:9999;transition:transform 0.2s;">
-      <i class="fas fa-comments"></i>
-      <span id="chatUnreadBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:#fff;font-size:0.65rem;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:none;align-items:center;justify-content:center;padding:0 4px;"></span>
-    </div>
-    <div id="chatWidgetBox" style="display:none;position:fixed;bottom:90px;right:24px;width:340px;max-width:calc(100vw - 48px);height:460px;max-height:calc(100vh - 140px);background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.3);z-index:9999;overflow:hidden;display:flex;flex-direction:column;">
-      <div style="padding:14px 16px;background:linear-gradient(135deg,var(--primary),#0040cc);color:#fff;display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <i class="fas fa-headset"></i>
-          <strong style="font-size:0.95rem;">Support Chat</strong>
-        </div>
-        <div onclick="toggleChatWidget()" style="cursor:pointer;font-size:1.1rem;opacity:0.8;"><i class="fas fa-times"></i></div>
-      </div>
-      <div id="chatWidgetMessages" style="flex:1;overflow-y:auto;padding:12px;min-height:0;"></div>
-      <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;">
-        <input type="text" id="chatWidgetInput" placeholder="Type a message..." style="flex:1;padding:10px 12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:20px;color:var(--text-primary);font-size:0.85rem;outline:none;" onkeypress="if(event.key==='Enter')sendChatWidget()">
-        <button onclick="sendChatWidget()" style="width:38px;height:38px;border-radius:50%;background:var(--primary);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.9rem;"><i class="fas fa-paper-plane"></i></button>
-      </div>
-    </div>
-  </div>
-
-  <script>
+﻿
     const API = (url, opts = {}) => {
       const token = localStorage.getItem('token');
       const headers = { ...(opts.headers || {}), 'Content-Type': 'application/json' };
@@ -180,7 +46,7 @@
               userData.balance = me.user.balance;
               document.getElementById('balanceVal').textContent = formatAmount(userData.balance);
             }).catch(() => {});
-            showToast('₦' + Number(d.totalRefunded).toLocaleString() + ' refunded to your wallet', 'success');
+            showToast('â‚¦' + Number(d.totalRefunded).toLocaleString() + ' refunded to your wallet', 'success');
           }
         }).catch(() => {});
         setInterval(checkAdminMessages, 15000);
@@ -220,7 +86,7 @@
       } catch (err) { window.location.href = '/login.html'; }
     }
 
-    function formatAmount(n) { return '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function formatAmount(n) { return 'â‚¦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
     async function checkAdminMessages() {
       try {
@@ -252,7 +118,7 @@
         const rejections = data.rejections || [];
         const banner = document.getElementById('withdrawRejectionBanner');
         if (rejections.length > 0) {
-          document.getElementById('withdrawRejectionContent').innerHTML = rejections.map(w => '<div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid #ef4444;"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">' + new Date(w.rejected_at).toLocaleString() + ' — ₦' + Number(w.amount).toLocaleString() + '</div><div>' + (w.admin_note || 'No reason provided') + '</div></div>').join('');
+          document.getElementById('withdrawRejectionContent').innerHTML = rejections.map(w => '<div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid #ef4444;"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">' + new Date(w.rejected_at).toLocaleString() + ' â€” â‚¦' + Number(w.amount).toLocaleString() + '</div><div>' + (w.admin_note || 'No reason provided') + '</div></div>').join('');
           banner.style.display = 'block';
         } else {
           banner.style.display = 'none';
@@ -312,8 +178,8 @@
         const badge = isLowerOrEqual ? '<div style="font-size:0.6rem;background:#ef4444;color:white;padding:2px 8px;border-radius:8px;margin-top:4px;display:inline-block;">CURRENT LEVEL</div>' : '';
         html += `<div class="vip-select-card" style="${isLowerOrEqual ? 'opacity:0.4;pointer-events:none;' : ''}" onclick="${isLowerOrEqual ? '' : 'selectVip(' + level + ')'}" id="vipCard${level}">
           <div class="level">VIP ${level}</div>
-          <div class="price">₦${plan.amount.toLocaleString()}</div>
-          <div class="return-amt">₦${plan.dailyReturn.toLocaleString()}/day</div>
+          <div class="price">â‚¦${plan.amount.toLocaleString()}</div>
+          <div class="return-amt">â‚¦${plan.dailyReturn.toLocaleString()}/day</div>
           <div class="vip-roi-badge">${roi}% ROI</div>
           <div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">Withdraw: ${plan.withdrawalDay}s</div>
           ${badge}
@@ -341,13 +207,13 @@
 
         <div class="vip-detail-amount">
           <div class="vip-detail-amount-label">Investment Amount</div>
-          <div class="vip-detail-amount-value">₦${plan.amount.toLocaleString()}</div>
+          <div class="vip-detail-amount-value">â‚¦${plan.amount.toLocaleString()}</div>
         </div>
 
         <div class="vip-features-grid">
           <div class="vip-feature-item">
             <i class="fas fa-coins" style="color:var(--accent);"></i>
-            <div><div class="vip-feature-label">Daily Return</div><div class="vip-feature-value">₦${plan.dailyReturn.toLocaleString()}</div></div>
+            <div><div class="vip-feature-label">Daily Return</div><div class="vip-feature-value">â‚¦${plan.dailyReturn.toLocaleString()}</div></div>
           </div>
           <div class="vip-feature-item">
             <i class="fas fa-calendar-check" style="color:var(--primary);"></i>
@@ -359,7 +225,7 @@
           </div>
           <div class="vip-feature-item">
             <i class="fas fa-chart-line" style="color:#22c55e;"></i>
-            <div><div class="vip-feature-label">Total Earnings</div><div class="vip-feature-value">₦${totalEarned.toLocaleString()}</div></div>
+            <div><div class="vip-feature-label">Total Earnings</div><div class="vip-feature-value">â‚¦${totalEarned.toLocaleString()}</div></div>
           </div>
           <div class="vip-feature-item">
             <i class="fas fa-percentage" style="color:#a855f7;"></i>
@@ -367,16 +233,16 @@
           </div>
           <div class="vip-feature-item">
             <i class="fas fa-briefcase" style="color:#06b6d4;"></i>
-            <div><div class="vip-feature-label">Monthly Return</div><div class="vip-feature-value">₦${(plan.dailyReturn * 30).toLocaleString()}</div></div>
+            <div><div class="vip-feature-label">Monthly Return</div><div class="vip-feature-value">â‚¦${(plan.dailyReturn * 30).toLocaleString()}</div></div>
           </div>
         </div>
 
         <div class="vip-detail-summary">
-          <div class="vip-summary-row"><span>Investment</span><span>₦${plan.amount.toLocaleString()}</span></div>
-          <div class="vip-summary-row"><span>Daily Return</span><span>₦${plan.dailyReturn.toLocaleString()}</span></div>
-          <div class="vip-summary-row"><span>Monthly (30 days)</span><span>₦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
-          <div class="vip-summary-row"><span>Yearly (365 days)</span><span>₦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
-          <div class="vip-summary-row total"><span>Total (2 Years)</span><span>₦${totalEarned.toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Investment</span><span>â‚¦${plan.amount.toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Daily Return</span><span>â‚¦${plan.dailyReturn.toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Monthly (30 days)</span><span>â‚¦${(plan.dailyReturn * 30).toLocaleString()}</span></div>
+          <div class="vip-summary-row"><span>Yearly (365 days)</span><span>â‚¦${(plan.dailyReturn * 365).toLocaleString()}</span></div>
+          <div class="vip-summary-row total"><span>Total (2 Years)</span><span>â‚¦${totalEarned.toLocaleString()}</span></div>
           <div style="padding:10px;margin-top:8px;background:rgba(239,68,68,0.05);border-radius:var(--radius-sm);border:1px solid rgba(239,68,68,0.15);font-size:0.78rem;color:#ef4444;"><i class="fas fa-receipt"></i> 10% VAT applies on all withdrawals</div>
         </div>
 
@@ -438,7 +304,7 @@
                 <div class="alert alert-success"><i class="fas fa-check-circle"></i> Complete payment in the popup window</div>
                 <div class="payment-amount-box">
                   <div class="payment-amount-label">Amount to Pay</div>
-                  <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
+                  <div class="payment-amount-value">â‚¦${pd.amount.toLocaleString()}</div>
                 </div>
                 <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.75rem;word-break:break-all;">${pd.reference}</span></div>
                 <div class="payment-countdown" id="paymentCountdown">
@@ -476,7 +342,7 @@
               </div>
               <div class="payment-amount-box">
                 <div class="payment-amount-label">Amount to Pay</div>
-                <div class="payment-amount-value">₦${pd.amount.toLocaleString()}</div>
+                <div class="payment-amount-value">â‚¦${pd.amount.toLocaleString()}</div>
               </div>
               <div class="payment-detail-row"><span class="label">Reference</span><span class="value" style="font-size:0.75rem;word-break:break-all;">${pd.reference}</span></div>
               <div class="payment-countdown" id="paymentCountdown">
@@ -723,12 +589,12 @@
         html += `<div class="investment-card" style="border-left:3px solid ${c};">
           <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${inv.status}</span></div><span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
           <div class="investment-details">
-            <div class="invest-detail"><div class="label">Invested</div><div class="val primary">₦${Number(inv.amount).toLocaleString()}</div></div>
-            <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">₦${Number(inv.dailyReturn).toLocaleString()}</div></div>
-            <div class="invest-detail"><div class="label">Collected</div><div class="val">₦${Number(inv.totalCollected).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Invested</div><div class="val primary">â‚¦${Number(inv.amount).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">â‚¦${Number(inv.dailyReturn).toLocaleString()}</div></div>
+            <div class="invest-detail"><div class="label">Collected</div><div class="val">â‚¦${Number(inv.totalCollected).toLocaleString()}</div></div>
             <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.daysCollected}</div></div>
           </div>
-          ${inv.status === 'active' ? '<div class="claim-btn-container"><button class="btn btn-accent" onclick="claimTask(' + inv.id + ')" id="claimBtn' + inv.id + '"><i class="fas fa-hand-pointer"></i> Collect (₦' + Number(inv.dailyReturn).toLocaleString() + ')</button></div>' : ''}
+          ${inv.status === 'active' ? '<div class="claim-btn-container"><button class="btn btn-accent" onclick="claimTask(' + inv.id + ')" id="claimBtn' + inv.id + '"><i class="fas fa-hand-pointer"></i> Collect (â‚¦' + Number(inv.dailyReturn).toLocaleString() + ')</button></div>' : ''}
           ${upgradeBtn}
         </div>`;
       });
@@ -772,13 +638,13 @@
             html += `<div class="investment-card" style="border-left:3px solid #22c55e;margin-bottom:12px;">
               <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span></div></div>
               <div class="investment-details">
-                <div class="invest-detail"><div class="label">Invested</div><div class="val primary">₦${Number(inv.amount).toLocaleString()}</div></div>
-                <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">₦${Number(inv.dailyReturn).toLocaleString()}</div></div>
-                <div class="invest-detail"><div class="label">Collected</div><div class="val">₦${Number(inv.totalCollected).toLocaleString()}</div></div>
+                <div class="invest-detail"><div class="label">Invested</div><div class="val primary">â‚¦${Number(inv.amount).toLocaleString()}</div></div>
+                <div class="invest-detail"><div class="label">Daily Return</div><div class="val accent">â‚¦${Number(inv.dailyReturn).toLocaleString()}</div></div>
+                <div class="invest-detail"><div class="label">Collected</div><div class="val">â‚¦${Number(inv.totalCollected).toLocaleString()}</div></div>
                 <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.daysCollected}</div></div>
               </div>
               <div class="claim-btn-container">
-                <button class="btn btn-accent btn-task-collect" data-inv-id="${inv.id}" style="width:100%;padding:14px;font-size:1rem;"><i class="fas fa-hand-pointer"></i> Collect ₦${Number(inv.dailyReturn).toLocaleString()}</button>
+                <button class="btn btn-accent btn-task-collect" data-inv-id="${inv.id}" style="width:100%;padding:14px;font-size:1rem;"><i class="fas fa-hand-pointer"></i> Collect â‚¦${Number(inv.dailyReturn).toLocaleString()}</button>
               </div>
             </div>`;
           });
@@ -850,26 +716,26 @@
       const withdrawDay = plan ? plan.withdrawalDay : null;
       const canWithdraw = weeksReady && withdrawDay && currentDay === withdrawDay;
 
-      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Total Balance:</strong> <span style="color:var(--primary);font-weight:700;">₦${bal.toLocaleString()}</span></p>
-        <p style="margin-bottom:8px;"><i class="fas fa-coins" style="color:#22c55e;"></i> <strong>Withdrawable Earnings:</strong> <span style="color:#22c55e;font-weight:700;">₦${earningsBal.toLocaleString()}</span> <span style="font-size:0.75rem;color:var(--text-muted);">(from daily tasks)</span></p>
+      infoDiv.innerHTML = `<p style="margin-bottom:8px;"><i class="fas fa-info-circle" style="color:var(--primary);"></i> <strong>Total Balance:</strong> <span style="color:var(--primary);font-weight:700;">â‚¦${bal.toLocaleString()}</span></p>
+        <p style="margin-bottom:8px;"><i class="fas fa-coins" style="color:#22c55e;"></i> <strong>Withdrawable Earnings:</strong> <span style="color:#22c55e;font-weight:700;">â‚¦${earningsBal.toLocaleString()}</span> <span style="font-size:0.75rem;color:var(--text-muted);">(from daily tasks)</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-crown" style="color:var(--gold);"></i> <strong>VIP Level:</strong> <span style="color:var(--gold);font-weight:700;">${userVip > 0 ? 'VIP ' + userVip : 'None'}</span></p>
-        <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? '₦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span>${bonusMatured ? ' <button class="btn btn-accent btn-sm" onclick="claimBonus()" id="claimBonusBtn" style="margin-left:8px;padding:4px 12px;font-size:0.75rem;"><i class="fas fa-plus-circle"></i> Add to Balance</button>' : ''}</p>
+        <p style="margin-bottom:8px;"><i class="fas fa-gift" style="color:#a855f7;"></i> <strong>Bonus Balance:</strong> <span style="color:#a855f7;font-weight:700;">${bonusBal > 0 ? 'â‚¦' + bonusBal.toLocaleString() + (bonusMatured ? ' (Ready)' : ' (Unlocks in ' + bonusRemaining + ' day(s))') : 'None'}</span>${bonusMatured ? ' <button class="btn btn-accent btn-sm" onclick="claimBonus()" id="claimBonusBtn" style="margin-left:8px;padding:4px 12px;font-size:0.75rem;"><i class="fas fa-plus-circle"></i> Add to Balance</button>' : ''}</p>
         <p style="margin-bottom:8px;"><i class="fas fa-calendar" style="color:var(--accent);"></i> <strong>Withdrawal Day:</strong> <span style="color:var(--accent);font-weight:700;">${withdrawDay || 'Not assigned'}</span></p>
         <p style="margin-bottom:8px;"><i class="fas fa-clock" style="color:${weeksReady ? '#22c55e' : '#ef4444'};"></i> <strong>Registration Wait:</strong> <span style="color:${weeksReady ? '#22c55e' : '#ef4444'};">${weeksReady ? 'Completed' : (7 - daysSinceReg) + ' day(s) remaining'}</span></p>
         <p><i class="fas fa-clock" style="color:${canWithdraw ? '#22c55e' : '#ef4444'};"></i> <strong>Today (${currentDay}):</strong> <span style="color:${canWithdraw ? '#22c55e' : '#ef4444'};">${canWithdraw ? 'Available!' : 'Not available today.'}</span></p>`;
 
       selectedWithdrawAmount = 0;
       formDiv.innerHTML = `<div class="payment-details-box"><h3><i class="fas fa-money-bill-wave" style="color:var(--accent);margin-right:8px;"></i> Withdraw</h3>
-        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${!weeksReady ? 'Withdrawals open 7 days after registration.' : canWithdraw ? 'Available to withdraw: ₦' + earningsBal.toLocaleString() : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
+        <p style="margin-bottom:12px;font-size:0.85rem;color:${canWithdraw ? 'var(--text-muted)' : '#ef4444'};">${!weeksReady ? 'Withdrawals open 7 days after registration.' : canWithdraw ? 'Available to withdraw: â‚¦' + earningsBal.toLocaleString() : 'Withdrawals open on ' + withdrawDay + 's only.'}</p>
         <div class="form-group"><label>Select Amount</label>
           <div id="withdrawAmounts" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;">
-            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= earningsBal && canWithdraw ? 'pointer' : 'not-allowed'};opacity:${a <= earningsBal && canWithdraw ? '1' : '0.4'};transition:all 0.2s;">₦${Number(a).toLocaleString()}</button>`).join('')}
+            ${WITHDRAW_AMOUNTS.map(a => `<button type="button" class="withdraw-amt-btn" onclick="selectWithdrawAmount(${a})" data-amount="${a}" style="padding:12px 8px;border-radius:var(--radius-sm);border:2px solid var(--border);background:var(--bg-dark);color:var(--text-primary);font-weight:700;font-size:0.95rem;cursor:${a <= earningsBal && canWithdraw ? 'pointer' : 'not-allowed'};opacity:${a <= earningsBal && canWithdraw ? '1' : '0.4'};transition:all 0.2s;">â‚¦${Number(a).toLocaleString()}</button>`).join('')}
           </div>
         </div>
         <div id="withdrawPreview" style="padding:12px;background:rgba(0,87,255,0.05);border-radius:var(--radius-sm);border:1px solid rgba(0,87,255,0.1);margin-bottom:16px;display:none;">
-          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;"><span style="color:var(--text-muted);">Withdrawal Amount</span><span id="previewAmount" style="font-weight:700;">₦0</span></div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;border-top:1px solid var(--border);"><span style="color:var(--text-muted);">VAT (10%)</span><span id="previewVat" style="color:#ef4444;font-weight:700;">-₦0</span></div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:1rem;border-top:2px solid var(--border);margin-top:4px;"><span style="font-weight:800;">You Will Receive</span><span id="previewCredit" style="color:#22c55e;font-weight:900;">₦0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;"><span style="color:var(--text-muted);">Withdrawal Amount</span><span id="previewAmount" style="font-weight:700;">â‚¦0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem;border-top:1px solid var(--border);"><span style="color:var(--text-muted);">VAT (10%)</span><span id="previewVat" style="color:#ef4444;font-weight:700;">-â‚¦0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:1rem;border-top:2px solid var(--border);margin-top:4px;"><span style="font-weight:800;">You Will Receive</span><span id="previewCredit" style="color:#22c55e;font-weight:900;">â‚¦0</span></div>
         </div>
         <div class="form-group"><label>Bank</label><input type="text" id="withdrawBank" placeholder="e.g. GTBank" ${!canWithdraw ? 'disabled' : ''}></div>
         <div class="form-group"><label>Account Number</label><input type="text" id="withdrawAccount" placeholder="10-digit number" maxlength="10" ${!canWithdraw ? 'disabled' : ''}></div>
@@ -882,7 +748,7 @@
       selectedWithdrawAmount = amount;
       const earningsBal = userData.earningsBalance || 0;
       if (amount > earningsBal) {
-        showToast('Insufficient earnings. Available: ₦' + Number(earningsBal).toLocaleString(), 'error');
+        showToast('Insufficient earnings. Available: â‚¦' + Number(earningsBal).toLocaleString(), 'error');
         selectedWithdrawAmount = 0;
         document.querySelectorAll('.withdraw-amt-btn').forEach(b => { b.style.borderColor = 'var(--border)'; b.style.background = 'var(--bg-dark)'; });
         document.getElementById('withdrawPreview').style.display = 'none';
@@ -901,9 +767,9 @@
       preview.style.display = 'block';
       const vat = Math.round(amount * 0.10);
       const credit = amount - vat;
-      document.getElementById('previewAmount').textContent = '₦' + amount.toLocaleString();
-      document.getElementById('previewVat').textContent = '-₦' + vat.toLocaleString();
-      document.getElementById('previewCredit').textContent = '₦' + credit.toLocaleString();
+      document.getElementById('previewAmount').textContent = 'â‚¦' + amount.toLocaleString();
+      document.getElementById('previewVat').textContent = '-â‚¦' + vat.toLocaleString();
+      document.getElementById('previewCredit').textContent = 'â‚¦' + credit.toLocaleString();
     }
 
     async function loadWithdrawHistory() {
@@ -921,7 +787,7 @@
           const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
           const vat = w.vatAmount || Math.round(Number(w.amount) * 0.10);
           const credit = w.creditAmount || (Number(w.amount) - vat);
-          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): ₦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: ₦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
+          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">â‚¦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): â‚¦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: â‚¦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
         });
         el.innerHTML = html;
       } catch (err) { el.innerHTML = ''; }
@@ -980,7 +846,7 @@
           const c = w.status === 'completed' ? '#22c55e' : w.status === 'pending' ? '#f59e0b' : '#ef4444';
           const vat = w.vatAmount || Math.round(Number(w.amount) * 0.10);
           const credit = w.creditAmount || (Number(w.amount) - vat);
-          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">₦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): ₦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: ₦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
+          html += `<div class="withdrawal-card"><div class="withdrawal-header"><div class="withdrawal-amount" style="color:var(--primary);">â‚¦${Number(w.amount).toLocaleString()}</div><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${w.status}</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);"><p><i class="fas fa-university"></i> ${w.bankName} - ${w.accountNumber}</p><p><i class="fas fa-user"></i> ${w.accountName}</p><p style="color:#ef4444;"><i class="fas fa-receipt"></i> VAT (10%): â‚¦${vat.toLocaleString()}</p><p style="color:#22c55e;font-weight:700;"><i class="fas fa-wallet"></i> You receive: â‚¦${credit.toLocaleString()}</p><p><i class="fas fa-clock"></i> ${new Date(w.createdAt).toLocaleString()}</p>${w.adminNote ? '<p style="color:var(--gold);"><i class="fas fa-comment"></i> ' + w.adminNote + '</p>' : ''}</div></div>`;
         });
         list.innerHTML = html;
       } catch (err) {}
@@ -1041,7 +907,7 @@
       area.innerHTML = '<div class="vip-detail-card" style="text-align:center;">' +
         '<div class="vip-detail-crown" style="margin:0 auto 16px;background:linear-gradient(135deg,#22c55e,#16a34a);"><i class="fas fa-download"></i></div>' +
         '<h3 style="margin-bottom:8px;">Install Enrich U App</h3>' +
-        '<p style="color:var(--text-secondary);margin-bottom:16px;">Add to your home screen for quick access — it\'s free!</p>' +
+        '<p style="color:var(--text-secondary);margin-bottom:16px;">Add to your home screen for quick access â€” it\'s free!</p>' +
         '<div class="install-steps">' +
         '<div class="install-step"><div class="install-step-num">1</div><div><strong>' + (isIOS ? 'iPhone/iPad' : isAndroid ? 'Android' : 'Computer') + '</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">' + (isIOS ? 'Tap the Share button > "Add to Home Screen"' : isAndroid ? 'Tap browser menu (3 dots) > "Add to Home screen"' : 'Click the install icon in the address bar or use browser menu') + '</span></div></div>' +
         '<div class="install-step"><div class="install-step-num">2</div><div><strong>Confirm</strong><br><span style="color:var(--text-secondary);font-size:0.85rem;">Tap "Add" or "Install" to confirm</span></div></div>' +
@@ -1077,7 +943,7 @@
           </div>
           <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid ${bonusMatured ? '#22c55e' : 'var(--border)'};margin-bottom:16px;">
             <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Bonus Balance</div>
-            <div style="font-size:1.5rem;font-weight:900;color:#a855f7;margin:8px 0;">₦${bonusBal.toLocaleString()}</div>
+            <div style="font-size:1.5rem;font-weight:900;color:#a855f7;margin:8px 0;">â‚¦${bonusBal.toLocaleString()}</div>
             ${bonusBal > 0 ? (bonusMatured
               ? '<div style="color:#22c55e;font-size:0.85rem;margin-bottom:12px;"><i class="fas fa-check-circle"></i> Ready!</div>'
               : '<div style="color:#ef4444;font-size:0.85rem;"><i class="fas fa-clock"></i> Unlocks in ' + bonusRemaining + ' day(s)</div>')
@@ -1102,7 +968,7 @@
             </div>
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
               <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">Earnings</div>
-              <div style="font-size:1.5rem;font-weight:900;color:var(--accent);">₦${Number(data.referralEarnings).toLocaleString()}</div>
+              <div style="font-size:1.5rem;font-weight:900;color:var(--accent);">â‚¦${Number(data.referralEarnings).toLocaleString()}</div>
             </div>
           </div>
           ${data.referrals && data.referrals.length
@@ -1165,7 +1031,7 @@
             <div style="font-weight:700;font-size:1rem;margin-bottom:8px;color:var(--primary);">${p.name}</div>
             <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><i class="fas fa-clock"></i> ${p.durationDays} days lock</div>
             <div style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:4px;"><i class="fas fa-percent"></i> ${p.interestRate}% interest</div>
-            <div style="font-size:0.85rem;color:var(--gold);">₦1,000 → ₦${returns.toLocaleString()}</div>
+            <div style="font-size:0.85rem;color:var(--gold);">â‚¦1,000 â†’ â‚¦${returns.toLocaleString()}</div>
           </div>`;
         });
         html += '</div>';
@@ -1180,10 +1046,10 @@
             const hours = Math.ceil(remaining / (1000 * 60 * 60));
             const timeLeft = days > 0 ? days + ' day(s)' : hours + ' hour(s)';
             html += `<div class="investment-card" style="margin-bottom:12px;">
-              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">₦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">Active</span></div></div>
+              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">â‚¦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);">Active</span></div></div>
               <div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);">
-                <p><i class="fas fa-percent"></i> Interest: ${s.interest_rate}% (₦${Number(s.interest).toLocaleString()})</p>
-                <p><i class="fas fa-coins"></i> Returns: ₦${Number(s.totalReturn).toLocaleString()}</p>
+                <p><i class="fas fa-percent"></i> Interest: ${s.interest_rate}% (â‚¦${Number(s.interest).toLocaleString()})</p>
+                <p><i class="fas fa-coins"></i> Returns: â‚¦${Number(s.totalReturn).toLocaleString()}</p>
                 <p><i class="fas fa-clock"></i> Matures: ${new Date(s.matures_at).toLocaleDateString()} (${timeLeft} left)</p>
               </div>
             </div>`;
@@ -1193,9 +1059,9 @@
           html += '<h3 style="margin:20px 0 12px;"><i class="fas fa-check-circle" style="color:#22c55e;margin-right:8px;"></i> Matured (' + matured.length + ')</h3>';
           matured.forEach(s => {
             html += `<div class="investment-card" style="margin-bottom:12px;border:1px solid rgba(34,197,94,0.3);">
-              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">₦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">Matured</span></div></div>
+              <div class="investment-header"><div class="investment-vip"><span class="vip-badge">â‚¦${Number(s.amount).toLocaleString()}</span><span class="status-badge" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3);">Matured</span></div></div>
               <div style="margin-top:12px;font-size:0.85rem;color:var(--text-secondary);">
-                <p><i class="fas fa-coins"></i> Ready to collect: ₦${Number(s.totalReturn).toLocaleString()} (₦${Number(s.amount).toLocaleString()} + ₦${Number(s.interest).toLocaleString()})</p>
+                <p><i class="fas fa-coins"></i> Ready to collect: â‚¦${Number(s.totalReturn).toLocaleString()} (â‚¦${Number(s.amount).toLocaleString()} + â‚¦${Number(s.interest).toLocaleString()})</p>
               </div>
               <button class="btn btn-primary" style="margin-top:12px;width:100%;" onclick="withdrawSavings(${s.id})"><i class="fas fa-hand-holding-dollar"></i> Collect Now</button>
             </div>`;
@@ -1206,8 +1072,8 @@
           withdrawn.slice(0, 5).forEach(s => {
             html += `<div class="investment-card" style="margin-bottom:8px;opacity:0.6;">
               <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:0.85rem;">₦${Number(s.amount).toLocaleString()} • ${s.duration_days}d • ${s.interest_rate}%</span>
-                <span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">Collected ₦${Number(s.totalReturn).toLocaleString()}</span>
+                <span style="font-size:0.85rem;">â‚¦${Number(s.amount).toLocaleString()} â€¢ ${s.duration_days}d â€¢ ${s.interest_rate}%</span>
+                <span class="status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">Collected â‚¦${Number(s.totalReturn).toLocaleString()}</span>
               </div>
             </div>`;
           });
@@ -1222,9 +1088,9 @@
       const interest = (1000 * rate / 100).toFixed(0);
       area.innerHTML = `<div class="investment-card" style="margin-bottom:16px;border:1px solid var(--primary);">
         <h4 style="margin-bottom:12px;"><i class="fas fa-piggy-bank" style="color:var(--primary);margin-right:8px;"></i> Create ${name}</h4>
-        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px;">Lock for ${days} days at ${rate}% interest. Minimum ₦1,000.</p>
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px;">Lock for ${days} days at ${rate}% interest. Minimum â‚¦1,000.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <input type="number" id="savingsAmount" placeholder="Enter amount (min ₦1,000)" min="1000" style="flex:1;min-width:200px;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+          <input type="number" id="savingsAmount" placeholder="Enter amount (min â‚¦1,000)" min="1000" style="flex:1;min-width:200px;padding:10px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
           <button class="btn btn-primary" onclick="createSavings(${planId})"><i class="fas fa-lock"></i> Lock Funds</button>
           <button class="btn btn-outline" onclick="document.getElementById('createSavingsForm').innerHTML=''">Cancel</button>
         </div>
@@ -1234,7 +1100,7 @@
     async function createSavings(planId) {
       const amountInput = document.getElementById('savingsAmount');
       const amount = parseFloat(amountInput.value);
-      if (!amount || amount < 1000) return showToast('Minimum amount is ₦1,000', 'error');
+      if (!amount || amount < 1000) return showToast('Minimum amount is â‚¦1,000', 'error');
       try {
         const res = await API('/api/savings/create', { method: 'POST', body: JSON.stringify({ planId, amount }) });
         const data = await res.json();
@@ -1368,11 +1234,11 @@
             </div>
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
               <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Wallet Balance</div>
-              <div style="font-size:1.3rem;font-weight:900;color:var(--primary);margin-top:4px;">₦${Number(u.balance).toLocaleString()}</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--primary);margin-top:4px;">â‚¦${Number(u.balance).toLocaleString()}</div>
             </div>
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
               <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Total Earned</div>
-              <div style="font-size:1.3rem;font-weight:900;color:var(--accent);margin-top:4px;">₦${Number(u.totalEarned).toLocaleString()}</div>
+              <div style="font-size:1.3rem;font-weight:900;color:var(--accent);margin-top:4px;">â‚¦${Number(u.totalEarned).toLocaleString()}</div>
             </div>
             <div style="padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);border:1px solid var(--border);">
               <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;">Member Since</div>
@@ -1448,7 +1314,7 @@
           const base64 = canvas.toDataURL('image/jpeg', 0.7);
           document.getElementById('profileAvatar').value = base64;
           document.getElementById('avatarPreview').innerHTML = '<img src="' + base64 + '" style="width:100%;height:100%;object-fit:cover;">';
-          showToast('Photo selected — tap Save to update', 'success');
+          showToast('Photo selected â€” tap Save to update', 'success');
         };
         img.src = e.target.result;
       };
@@ -1561,66 +1427,4 @@
     // Start: first popup after 3s, then random 8-15s
     setTimeout(function(){ _showDemoInv(); _checkReal(); setInterval(_checkReal, 10000); }, 3000);
     (function _demoLoop(){ setTimeout(function(){ if(Math.random()>0.45){_showDemoInv();}else{_showDemoWd();} _demoLoop(); }, 8000+Math.random()*7000); })();
-  </script>
-
-  <!-- Install App Banner -->
-  <div id="installBanner" class="install-banner" style="display:none;">
-    <div class="install-banner-content">
-      <div class="install-banner-icon"><i class="fas fa-mobile-alt"></i></div>
-      <div class="install-banner-text">
-        <strong>Install Enrich U App</strong>
-        <span>Add to your home screen for quick access</span>
-      </div>
-      <div class="install-banner-actions">
-        <button class="btn btn-primary btn-sm" onclick="installApp()"><i class="fas fa-download"></i> Install</button>
-        <button class="btn btn-outline btn-sm" onclick="dismissInstall()"><i class="fas fa-times"></i></button>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-    }
-
-    // PWA Install Prompt
-    let deferredPrompt = null;
-    const isAlreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (!isAlreadyInstalled) {
-        const dismissed = localStorage.getItem('installDismissed');
-        if (!dismissed) {
-          document.getElementById('installBanner').style.display = 'block';
-        }
-      }
-    });
-
-    function installApp() {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(r => {
-          if (r.outcome === 'accepted') showToast('App installed successfully!', 'success');
-          deferredPrompt = null;
-          document.getElementById('installBanner').style.display = 'none';
-        });
-      } else {
-        showToast('Tap your browser menu > "Add to Home Screen"', 'info');
-      }
-    }
-
-    function dismissInstall() {
-      document.getElementById('installBanner').style.display = 'none';
-      localStorage.setItem('installDismissed', '1');
-    }
-
-    window.addEventListener('appinstalled', () => {
-      document.getElementById('installBanner').style.display = 'none';
-      showToast('Enrich U installed!', 'success');
-    });
-  </script>
-</body>
-</html>
+  

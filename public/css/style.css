@@ -1836,6 +1836,130 @@ body {
   transition: width 10s linear;
 }
 
+/* Payment Status Tracker */
+.payment-tracker {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--bg-dark);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.tracker-stages {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.tracker-stages::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  right: 24px;
+  height: 3px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.tracker-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+  flex: 1;
+}
+
+.tracker-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 3px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  transition: all 0.4s ease;
+}
+
+.tracker-stage.active .tracker-dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+  animation: pulseDot 1.2s ease infinite;
+}
+
+.tracker-stage.done .tracker-dot {
+  border-color: #22c55e;
+  background: #22c55e;
+  color: white;
+}
+
+.tracker-stage.error .tracker-dot {
+  border-color: #ef4444;
+  background: #ef4444;
+  color: white;
+}
+
+.tracker-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.tracker-stage.active .tracker-label { color: var(--primary); }
+.tracker-stage.done .tracker-label { color: #22c55e; }
+.tracker-stage.error .tracker-label { color: #ef4444; }
+
+.tracker-progress-line {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  height: 3px;
+  background: var(--primary);
+  z-index: 1;
+  transition: width 0.5s ease;
+  border-radius: 2px;
+}
+
+.tracker-msg {
+  text-align: center;
+  padding: 12px;
+  margin-top: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background: rgba(0, 87, 255, 0.05);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 87, 255, 0.1);
+}
+
+.tracker-msg.success {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.tracker-msg.error {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.tracker-msg i { margin-right: 6px; }
+
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 87, 255, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(0, 87, 255, 0); }
+}
+
 /* Install App Banner */
 .install-banner {
   position: fixed;
