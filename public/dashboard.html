@@ -719,7 +719,7 @@
       let html = '';
       investments.forEach(inv => {
         const c = inv.status === 'active' ? '#22c55e' : inv.status === 'upgraded' ? '#a855f7' : '#ef4444';
-        const upgradeBtn = inv.status === 'active' && inv.vipLevel < 9 ? `<button class="btn btn-outline btn-sm" onclick="upgradeVip(${inv.vipLevel + 1})" style="margin-top:8px;"><i class="fas fa-arrow-up"></i> Upgrade to VIP ${inv.vipLevel + 1}</button>` : '';
+        const upgradeBtn = inv.status === 'active' && inv.vipLevel < 24 ? `<button class="btn btn-outline btn-sm" onclick="upgradeVip(${inv.vipLevel + 1})" style="margin-top:8px;"><i class="fas fa-arrow-up"></i> Upgrade to VIP ${inv.vipLevel + 1}</button>` : '';
         html += `<div class="investment-card" style="border-left:3px solid ${c};">
           <div class="investment-header"><div class="investment-vip"><span class="vip-badge">VIP ${inv.vipLevel}</span><span class="status-badge" style="background:${c}22;color:${c};border:1px solid ${c}33;">${inv.status}</span></div><span style="font-size:0.8rem;color:var(--text-muted);">Since ${new Date(inv.createdAt).toLocaleDateString()}</span></div>
           <div class="investment-details">

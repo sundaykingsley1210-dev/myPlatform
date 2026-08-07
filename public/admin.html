@@ -717,10 +717,10 @@
     }
 
     async function adminUpgradeVip(userId, username) {
-      const level = prompt('Upgrade ' + username + ' to which VIP level? (1-9):');
-      if (!level) return;
+      const level = prompt('Upgrade ' + username + ' to which VIP level? (1-24):');
+      
       const vipLevel = parseInt(level);
-      if (vipLevel < 1 || vipLevel > 9) { showToast('VIP level must be 1-9', 'error'); return; }
+      if (vipLevel < 1 || vipLevel > 24) { showToast('VIP level must be 1-24', 'error'); return; }
       if (!confirm('Upgrade ' + username + ' to VIP ' + vipLevel + '?')) return;
       try {
         const res = await API('/api/admin/upgrade-vip/' + userId, { method: 'POST', body: JSON.stringify({ vipLevel }) });

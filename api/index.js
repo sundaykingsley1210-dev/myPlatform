@@ -23,7 +23,22 @@ const VIP_PLANS = {
   6: { amount: 120000, dailyReturn: 6000, withdrawalDay: 'Thursday' },
   7: { amount: 200000, dailyReturn: 10000, withdrawalDay: 'Thursday' },
   8: { amount: 230000, dailyReturn: 11500, withdrawalDay: 'Friday' },
-  9: { amount: 280000, dailyReturn: 14000, withdrawalDay: 'Friday' }
+  9: { amount: 280000, dailyReturn: 14000, withdrawalDay: 'Friday' },
+  10: { amount: 300000, dailyReturn: 15000, withdrawalDay: 'Tuesday' },
+  11: { amount: 360000, dailyReturn: 18000, withdrawalDay: 'Wednesday' },
+  12: { amount: 400000, dailyReturn: 20000, withdrawalDay: 'Thursday' },
+  13: { amount: 540000, dailyReturn: 27000, withdrawalDay: 'Friday' },
+  14: { amount: 620000, dailyReturn: 31000, withdrawalDay: 'Tuesday' },
+  15: { amount: 720000, dailyReturn: 36000, withdrawalDay: 'Wednesday' },
+  16: { amount: 800000, dailyReturn: 40000, withdrawalDay: 'Thursday' },
+  17: { amount: 940000, dailyReturn: 47000, withdrawalDay: 'Friday' },
+  18: { amount: 1200000, dailyReturn: 60000, withdrawalDay: 'Tuesday' },
+  19: { amount: 2000000, dailyReturn: 100000, withdrawalDay: 'Wednesday' },
+  20: { amount: 2500000, dailyReturn: 125000, withdrawalDay: 'Thursday' },
+  21: { amount: 3200000, dailyReturn: 160000, withdrawalDay: 'Friday' },
+  22: { amount: 4000000, dailyReturn: 200000, withdrawalDay: 'Tuesday' },
+  23: { amount: 4200000, dailyReturn: 210000, withdrawalDay: 'Wednesday' },
+  24: { amount: 5000000, dailyReturn: 250000, withdrawalDay: 'Thursday' }
 };
 
 app.use(express.json());
@@ -1264,7 +1279,7 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
 app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, res) => {
   const { vipLevel } = req.body;
   const userId = parseInt(req.params.id);
-  if (!vipLevel || vipLevel < 1 || vipLevel > 9) return res.status(400).json({ error: 'Valid VIP level (1-9) required' });
+  if (!vipLevel || vipLevel < 1 || vipLevel > 24) return res.status(400).json({ error: 'Valid VIP level (1-24) required' });
   try {
     const user = await dbQuery('users', 'id, username, vip_level', { id: userId }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
