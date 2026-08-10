@@ -593,18 +593,21 @@ app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
   try {
     const users = await dbQuery('users', 'id', {});
     const investments = await dbQuery('investments', 'id, amount', { status: 'active' });
-    const withdrawals = await dbQuery('withdrawals', 'id, amount', { status: 'pending' });
+    const pendingWithdrawals = await dbQuery('withdrawals', 'id, amount', { status: 'pending' });
+    const approvedWithdrawals = await dbQuery('withdrawals', 'id, amount', { status: 'approved' });
     const totalInvested = await dbQuery('investments', 'amount', {});
     const pendingPayments = await dbQuery('transactions', 'id', { status: 'pending_approval' });
 
     const totalUsers = users.data?.length || 0;
     const activeInvestments = investments.data?.length || 0;
-    const pendingWithdrawals = withdrawals.data?.length || 0;
+    const pendingWithdrawalCount = pendingWithdrawals.data?.length || 0;
+    const approvedWithdrawalCount = approvedWithdrawals.data?.length || 0;
     const pendingPaymentCount = pendingPayments.data?.length || 0;
     const totalInvestedAmount = totalInvested.data?.reduce((sum, i) => sum + (i.amount || 0), 0) || 0;
-    const pendingWithdrawalAmount = withdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+    const pendingWithdrawalAmount = pendingWithdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
+    const approvedWithdrawalAmount = approvedWithdrawals.data?.reduce((sum, w) => sum + (w.amount || 0), 0) || 0;
 
-    res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals, pendingPaymentCount, totalInvestedAmount, pendingWithdrawalAmount } });
+    res.json({ stats: { totalUsers, activeInvestments, pendingWithdrawals: pendingWithdrawalCount, approvedWithdrawals: approvedWithdrawalCount, pendingPaymentCount, totalInvestedAmount, pendingWithdrawalAmount, approvedWithdrawalAmount } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -717,10 +720,23 @@ app.post('/api/admin/withdrawal/:id/approve', requireAuth, requireAdmin, async (
     const result = await dbQuery('withdrawals', 'user_id, amount', { id: parseInt(id) }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
-    await dbUpdate('withdrawals', { status: 'completed', admin_note: req.body.note || 'Approved by admin' }, { id: parseInt(id) });
-    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Approved', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been approved and processed.` });
+    await dbUpdate('withdrawals', { status: 'approved', admin_note: req.body.note || 'Approved by admin — payment pending', approved_at: new Date().toISOString() }, { id: parseInt(id) });
+    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Approved', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been approved. Payment is being processed.` });
 
     res.json({ success: true, message: 'Withdrawal approved' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/withdrawal/:id/confirm', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
+    if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
+
+    await dbUpdate('withdrawals', { status: 'completed', admin_note: req.body.note || 'Payment confirmed — funds sent', confirmed_at: new Date().toISOString() }, { id: parseInt(id) });
+    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Paid', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been sent to ${result.data.bank_name} (${result.data.account_number}). Please check your account.` });
+
+    res.json({ success: true, message: 'Payment confirmed' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -880,6 +896,8 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('transactions.rejected_at added'); } catch (e) { results.push('transactions.rejected_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS approved_at TEXT DEFAULT \'\'' }); results.push('withdrawals.approved_at added'); } catch (e) { results.push('withdrawals.approved_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT DEFAULT \'\'' }); results.push('withdrawals.confirmed_at added'); } catch (e) { results.push('withdrawals.confirmed_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
     try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 150 WHERE vip_level = 1 AND status = 'active'" }); results.push('VIP 1 daily_return updated to 150'); } catch (e) { results.push('VIP 1 update: ' + e.message); }
