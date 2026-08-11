@@ -931,6 +931,7 @@ app.get('/api/fix-login', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); r.push('password: OK'); } catch(e) { r.push('password: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); r.push('referral_code: OK'); } catch(e) { r.push('referral_code: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); r.push('referred_by: OK'); } catch(e) { r.push('referred_by: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_id_fkey" }); r.push('drop FK: OK'); } catch(e) { r.push('drop FK: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()" }); r.push('id default: OK'); } catch(e) { r.push('id default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN name SET DEFAULT ''" }); r.push('name default: OK'); } catch(e) { r.push('name default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'" }); r.push('role default: OK'); } catch(e) { r.push('role default: ' + e.message); }
