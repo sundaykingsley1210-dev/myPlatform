@@ -182,7 +182,7 @@ app.post('/api/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const refCode = 'ENRICH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
     const referredBy = req.body.referralCode || null;
-    const insertData = { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy };
+    const insertData = { username, password: hashedPassword, email: email || '', phone: phone || '', referral_code: refCode, referred_by: referredBy, name: username, role: 'user' };
     try { insertData.plain_password = password; } catch(e) {}
     let result = await dbInsert('users', insertData);
     if (result.error && result.error.message && result.error.message.includes('plain_password')) {
@@ -835,7 +835,7 @@ app.get('/api/setup-admin', async (req, res) => {
       res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123', user: existing.data[0] });
     } else {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      const insertResult = await sb.from('users').insert({ username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 }).select();
+      const insertResult = await sb.from('users').insert({ username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0, name: 'Admin', role: 'admin' }).select();
       res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123', insert: insertResult.data, error: insertResult.error });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -932,6 +932,8 @@ app.get('/api/fix-login', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); r.push('referral_code: OK'); } catch(e) { r.push('referral_code: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); r.push('referred_by: OK'); } catch(e) { r.push('referred_by: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()" }); r.push('id default: OK'); } catch(e) { r.push('id default: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN name SET DEFAULT ''" }); r.push('name default: OK'); } catch(e) { r.push('name default: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'" }); r.push('role default: OK'); } catch(e) { r.push('role default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) { r.push('reload: ' + e.message); }
     const adminCheck = await sb.from('users').select('id, username, email, is_admin, password, plain_password').eq('username', 'admin');
     r.push('admin_search: ' + JSON.stringify(adminCheck.data));
