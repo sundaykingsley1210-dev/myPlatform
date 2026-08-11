@@ -824,15 +824,18 @@ app.post('/api/admin/reject-reset/:id', requireAuth, requireAdmin, async (req, r
 // ===================== SETUP ADMIN =====================
 app.get('/api/setup-admin', async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, is_admin', { username: 'admin' }, { single: true });
-    if (result.data) {
-      const hashedPassword = await bcrypt.hash('admin123', 10);
-      await dbUpdate('users', { is_admin: true, password: hashedPassword, plain_password: 'admin123' }, { username: 'admin' });
+    const result = await dbQuery('users', 'id, is_admin, username, password', { username: 'admin' }, { single: true });
+    if (result.data && result.data.password) {
       res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123' });
     } else {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      await dbInsert('users', { username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
-      res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
+      if (result.data) {
+        await dbUpdate('users', { is_admin: true, password: hashedPassword, plain_password: 'admin123', username: 'admin' }, { id: result.data.id });
+        res.json({ success: true, message: 'Admin account updated. Username: admin, Password: admin123' });
+      } else {
+        await dbInsert('users', { username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
+        res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
+      }
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -912,6 +915,10 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 10000 WHERE vip_level = 7 AND status = 'active'" }); results.push('VIP 7 daily_return updated to 10000'); } catch (e) { results.push('VIP 7 update: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 11500 WHERE vip_level = 8 AND status = 'active'" }); results.push('VIP 8 daily_return updated to 11500'); } catch (e) { results.push('VIP 8 update: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 14000 WHERE vip_level = 9 AND status = 'active'" }); results.push('VIP 9 daily_return updated to 14000'); } catch (e) { results.push('VIP 9 update: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT DEFAULT ''" }); results.push('users.username added'); } catch (e) { results.push('users.username: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); results.push('users.password added'); } catch (e) { results.push('users.password: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
