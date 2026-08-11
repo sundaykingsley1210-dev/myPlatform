@@ -828,18 +828,15 @@ app.post('/api/admin/reject-reset/:id', requireAuth, requireAdmin, async (req, r
 // ===================== SETUP ADMIN =====================
 app.get('/api/setup-admin', async (req, res) => {
   try {
-    const result = await dbQuery('users', 'id, is_admin, username, password', { username: 'admin' }, { single: true });
-    if (result.data && result.data.password) {
-      res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123' });
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    const existing = await sb.from('users').select('id, username, password, is_admin, plain_password').eq('username', 'admin').limit(1);
+    if (existing.data && existing.data.length > 0 && existing.data[0].password) {
+      res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123', user: existing.data[0] });
     } else {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      if (result.data) {
-        await dbUpdate('users', { is_admin: true, password: hashedPassword, plain_password: 'admin123', username: 'admin' }, { id: result.data.id });
-        res.json({ success: true, message: 'Admin account updated. Username: admin, Password: admin123' });
-      } else {
-        await dbInsert('users', { username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 });
-        res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
-      }
+      const insertResult = await sb.from('users').insert({ username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0 }).select();
+      res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123', insert: insertResult.data, error: insertResult.error });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -936,8 +933,10 @@ app.get('/api/fix-login', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); r.push('referred_by: OK'); } catch(e) { r.push('referred_by: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "UPDATE users SET username = 'admin', is_admin = true WHERE email = 'enrichu001@gmail.com'" }); r.push('admin set: OK'); } catch(e) { r.push('admin set: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) { r.push('reload: ' + e.message); }
-    const check = await sb.from('users').select('id, username, email, is_admin, plain_password').limit(3);
+    const check = await sb.from('users').select('id, username, email, is_admin, plain_password').limit(10);
     r.push('users: ' + JSON.stringify(check.data));
+    const adminCheck = await sb.from('users').select('id, username, email, is_admin, password, plain_password').eq('username', 'admin');
+    r.push('admin_search: ' + JSON.stringify(adminCheck.data) + ' error: ' + JSON.stringify(adminCheck.error));
     res.json({ success: true, results: r });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
