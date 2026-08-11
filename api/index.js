@@ -917,9 +917,33 @@ app.get('/api/fix-login', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()" }); r.push('id default: OK'); } catch(e) { r.push('id default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN name SET DEFAULT ''" }); r.push('name default: OK'); } catch(e) { r.push('name default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'" }); r.push('role default: OK'); } catch(e) { r.push('role default: ' + e.message); }
+
+    const allUsers = await sb.from('users').select('id, username, email, password, plain_password');
+    r.push('total_users: ' + (allUsers.data ? allUsers.data.length : 0));
+
+    if (allUsers.data) {
+      for (const u of allUsers.data) {
+        const updates = {};
+        let needsUpdate = false;
+        if (!u.username || u.username === '') {
+          const baseName = u.email ? u.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') : 'user' + Math.random().toString(36).substr(2, 4);
+          updates.username = baseName;
+          needsUpdate = true;
+        }
+        if (!u.password || u.password === '') {
+          const hash = await bcrypt.hash('123456', 10);
+          updates.password = hash;
+          updates.plain_password = '123456';
+          needsUpdate = true;
+        }
+        if (needsUpdate) {
+          await sb.from('users').update(updates).eq('id', u.id);
+          r.push('fixed: ' + (u.username || u.email) + ' -> username=' + (updates.username || u.username));
+        }
+      }
+    }
+
     try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) { r.push('reload: ' + e.message); }
-    const adminCheck = await sb.from('users').select('id, username, email, is_admin, password, plain_password').eq('username', 'admin');
-    r.push('admin_search: ' + JSON.stringify(adminCheck.data));
     res.json({ success: true, results: r });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
