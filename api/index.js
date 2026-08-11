@@ -205,9 +205,9 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
   try {
-    let result = await dbQuery('users', 'id, username, password, plain_password, balance, total_earned, is_admin, nickname, avatar_url, vip_level, email', { username }, { single: true });
+    let result = await dbQuery('users', '*', { username }, { single: true });
     if (!result.data && username.includes('@')) {
-      result = await dbQuery('users', 'id, username, password, plain_password, balance, total_earned, is_admin, nickname, avatar_url, vip_level, email', { email: username }, { single: true });
+      result = await dbQuery('users', '*', { email: username }, { single: true });
     }
     if (!result.data) return res.status(400).json({ error: 'Invalid username/email or password' });
 

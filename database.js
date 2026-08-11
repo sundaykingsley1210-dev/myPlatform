@@ -150,9 +150,15 @@ async function dbQuery(table, columns = '*', filters = {}, options = {}) {
     return { data: result || [], error: null };
   }
 
-  let result = await buildQuery(table, columns, filters, options);
+  const query = buildQuery(table, columns, filters, options);
+  let result;
+  try {
+    result = await query;
+  } catch (e) {
+    result = e;
+  }
 
-  if (result.error && isTableNotFoundError(result.error.message)) {
+  if (result && result.error && isTableNotFoundError(result.error.message)) {
     console.log(`Table "${table}" not found in Supabase, using in-memory fallback`);
     const memResult = memSelect(table, columns, filters, options);
     if (options.single) return { data: memResult, error: null };
