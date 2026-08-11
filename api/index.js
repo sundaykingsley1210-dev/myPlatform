@@ -904,46 +904,7 @@ app.get('/api/migrate', async (req, res) => {
 });
 
 app.get('/api/fix-login', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.json({ error: 'No Supabase' });
-    const r = [];
-
-    const allUsers = await sb.from('users').select('id, username, email, password, plain_password, is_admin');
-    r.push('total_users: ' + (allUsers.data ? allUsers.data.length : 0));
-    r.push('users_before: ' + JSON.stringify(allUsers.data?.map(u => ({ username: u.username, email: u.email, hasPassword: !!u.password, hasPlain: !!u.plain_password }))));
-
-    if (allUsers.data) {
-      for (const u of allUsers.data) {
-        const updates = {};
-        let needsUpdate = false;
-        if (!u.username || u.username === '' || u.username === null) {
-          const baseName = u.email ? u.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') : 'user' + Math.random().toString(36).substr(2, 4);
-          updates.username = baseName;
-          needsUpdate = true;
-        }
-        if (!u.password || u.password === '' || u.password === null) {
-          const hash = await bcrypt.hash('123456', 10);
-          updates.password = hash;
-          updates.plain_password = '123456';
-          needsUpdate = true;
-        }
-        if (needsUpdate) {
-          const updResult = await sb.from('users').update(updates).eq('id', u.id);
-          r.push('fixed ' + (u.email || 'unknown') + ': ' + JSON.stringify(updates) + ' err:' + JSON.stringify(updResult.error));
-        } else {
-          r.push('skip ' + (u.email || 'unknown') + ': already has data');
-        }
-      }
-    }
-
-    const afterUsers = await sb.from('users').select('id, username, email, password, plain_password, is_admin');
-    r.push('users_after: ' + JSON.stringify(afterUsers.data?.map(u => ({ username: u.username, email: u.email, hasPassword: !!u.password }))));
-
-    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) {}
-    res.json({ success: true, results: r });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ message: 'Endpoint no longer needed. Login is working.' });
 });
 
 // ===================== PROFILE SETTINGS =====================
