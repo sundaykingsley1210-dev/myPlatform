@@ -876,17 +876,17 @@ app.post('/api/admin/withdrawal/:id/confirm', requireAuth, requireAdmin, async (
 app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('withdrawals', 'user_id, amount, earnings_amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
     await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin', rejected_at: new Date().toISOString() }, { id: parseInt(id) });
-    await dbUpdate('users', { balance: { op: 'increment', val: result.data.amount } }, { id: result.data.user_id });
 
-    const userRes = await dbQuery('users', 'balance', { id: result.data.user_id }, { single: true });
-    const refund = userRes.data.balance + result.data.amount;
-    await dbUpdate('users', { balance: refund }, { id: result.data.user_id });
+    const userRes = await dbQuery('users', 'earnings_balance', { id: result.data.user_id }, { single: true });
+    const currentEarnings = parseFloat(userRes.data.earnings_balance) || 0;
+    const refundAmount = parseFloat(result.data.amount) || 0;
+    await dbUpdate('users', { earnings_balance: currentEarnings + refundAmount }, { id: result.data.user_id });
 
-    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Rejected', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been rejected. Amount has been refunded to your wallet. Reason: ${req.body.note || 'No reason provided'}` });
+    await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Rejected', message: `Your withdrawal of ₦${refundAmount.toLocaleString()} has been rejected and refunded to your earnings balance. Reason: ${req.body.note || 'No reason provided'}` });
 
     res.json({ success: true, message: 'Withdrawal rejected and refunded' });
   } catch (err) { res.status(500).json({ error: err.message }); }
