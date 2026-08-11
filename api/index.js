@@ -127,6 +127,60 @@ app.get('/api/debug-users', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/restore-user', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const bcrypt = require('bcryptjs');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+
+    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance, old_user_id } = req.query;
+    if (!username || !email || !password) return res.status(400).json({ error: 'Missing username, email, or password' });
+
+    const hash = await bcrypt.hash(password, 10);
+
+    const existing = await sb.from('users').select('id').eq('username', username).single();
+    if (existing.data) {
+      const { error: ue } = await sb.from('users').update({
+        email, password: hash, plain_password: password,
+        balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
+        vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
+        bonus_balance: Number(bonus_balance) || 0
+      }).eq('id', existing.data.id);
+      if (ue) return res.status(500).json({ error: ue.message });
+
+      if (old_user_id) {
+        await sb.from('investments').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
+        await sb.from('transactions').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
+        await sb.from('task_claims').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
+        await sb.from('notifications').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
+        await sb.from('withdrawals').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
+      }
+
+      return res.json({ success: true, message: `Updated ${username}`, user_id: existing.data.id });
+    }
+
+    const userId = crypto.randomUUID();
+    const { error: ue } = await sb.from('users').insert({
+      id: userId, username, email, password: hash, plain_password: password,
+      balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
+      vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
+      bonus_balance: Number(bonus_balance) || 0, is_admin: false
+    });
+    if (ue) return res.status(500).json({ error: ue.message });
+
+    if (old_user_id) {
+      await sb.from('investments').update({ user_id: userId }).eq('user_id', Number(old_user_id));
+      await sb.from('transactions').update({ user_id: userId }).eq('user_id', Number(old_user_id));
+      await sb.from('task_claims').update({ user_id: userId }).eq('user_id', Number(old_user_id));
+      await sb.from('notifications').update({ user_id: userId }).eq('user_id', Number(old_user_id));
+      await sb.from('withdrawals').update({ user_id: userId }).eq('user_id', Number(old_user_id));
+    }
+
+    res.json({ success: true, message: `Created ${username}`, user_id: userId });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 }
