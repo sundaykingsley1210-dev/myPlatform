@@ -212,6 +212,39 @@ app.get('/api/recreate-investments', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/recreate-transactions', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+    const { user_id, transactions } = req.query;
+    if (!user_id || !transactions) return res.status(400).json({ error: 'Missing user_id or transactions' });
+    const txData = JSON.parse(transactions);
+    const results = [];
+    for (const tx of txData) {
+      const { error } = await sb.from('transactions').insert({
+        user_id, type: tx.type, amount: tx.amount, status: tx.status || 'completed', vip_level: tx.vip_level || 0
+      });
+      results.push(error ? error.message : `${tx.type} ₦${tx.amount} inserted`);
+    }
+    res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/cleanup-orphaned', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+    const results = [];
+    const tables = ['investments', 'transactions', 'task_claims', 'notifications', 'withdrawals', 'savings', 'messages'];
+    for (const t of tables) {
+      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${t} WHERE user_id IS NULL` }); results.push(`${t}: cleared`); } catch (e) { results.push(`${t}: ${e.message}`); }
+    }
+    res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 }
