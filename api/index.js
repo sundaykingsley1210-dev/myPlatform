@@ -919,6 +919,8 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); results.push('users.password added'); } catch (e) { results.push('users.password: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE users SET username = 'admin' WHERE email = 'enrichu001@gmail.com' AND (username IS NULL OR username = '')" }); results.push('admin username set'); } catch (e) { results.push('admin username set: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "UPDATE users SET is_admin = true WHERE email = 'enrichu001@gmail.com'" }); results.push('admin flag set'); } catch (e) { results.push('admin flag set: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
