@@ -111,25 +111,7 @@ app.get('/api/migrate-db', async (req, res) => {
 
 // DEBUG: Check Supabase connection and table status
 app.get('/api/debug-db', async (req, res) => {
-  const { supabase: getSupabase, isSupabase } = require('../database');
-  const sb = getSupabase();
-  if (!sb) return res.json({ connected: false, error: 'No Supabase client' });
-
-  const results = {};
-  const tables = ['users', 'investments', 'transactions', 'withdrawals', 'task_claims', 'notifications', 'messages', 'reset_requests'];
-  for (const t of tables) {
-    try {
-      const r = await sb.from(t).select('*').limit(1);
-      results[t] = { exists: !r.error, error: r.error ? r.error.message : null, count: r.data ? r.data.length : 0, sample: r.data && r.data[0] ? Object.keys(r.data[0]) : [] };
-    } catch (e) {
-      results[t] = { exists: false, error: e.message };
-    }
-  }
-
-  const userQ = await sb.from('users').select('id, username, password, plain_password, is_admin, email').eq('username', 'admin').single();
-  results.adminQuery = { data: userQ.data, error: userQ.error ? userQ.error.message : null };
-
-  res.json({ connected: true, isSupabase: isSupabase(), results });
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 function generateToken(user) {
@@ -830,13 +812,13 @@ app.get('/api/setup-admin', async (req, res) => {
   try {
     const { supabase: getSupabase } = require('../database');
     const sb = getSupabase();
-    const existing = await sb.from('users').select('id, username, password, is_admin, plain_password').eq('username', 'admin').limit(1);
+    const existing = await sb.from('users').select('id, username, password, is_admin').eq('username', 'admin').limit(1);
     if (existing.data && existing.data.length > 0 && existing.data[0].password) {
-      res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123', user: existing.data[0] });
+      res.json({ success: true, message: 'Admin account ready. Username: admin, Password: admin123' });
     } else {
       const hashedPassword = await bcrypt.hash('admin123', 10);
       const insertResult = await sb.from('users').insert({ username: 'admin', password: hashedPassword, plain_password: 'admin123', email: 'enrichu001@gmail.com', is_admin: true, balance: 0, total_earned: 0, vip_level: 0, name: 'Admin', role: 'admin' }).select();
-      res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123', insert: insertResult.data, error: insertResult.error });
+      res.json({ success: true, message: 'Admin account created. Username: admin, Password: admin123' });
     }
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
