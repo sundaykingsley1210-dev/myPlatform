@@ -114,6 +114,19 @@ app.get('/api/debug-db', async (req, res) => {
   res.json({ disabled: 'Endpoint removed for production' });
 });
 
+app.get('/api/debug-users', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.json({ error: 'No Supabase' });
+    const users = await sb.from('users').select('id, username, email, balance, total_earned, vip_level, earnings_balance, bonus_balance, is_admin, plain_password, created_at');
+    const investments = await sb.from('investments').select('id, user_id, vip_level, amount, daily_return, status, total_collected, days_collected');
+    const transactions = await sb.from('transactions').select('id, user_id, type, amount, status, vip_level');
+    const withdrawals = await sb.from('withdrawals').select('id, user_id, amount, status');
+    res.json({ users: users.data, investments: investments.data, transactions: transactions.data, withdrawals: withdrawals.data });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 }
