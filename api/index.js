@@ -245,6 +245,19 @@ app.get('/api/cleanup-orphaned', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/delete-investment', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ error: 'Missing id' });
+    const { error } = await sb.from('investments').delete().eq('id', Number(id));
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, message: `Deleted investment ${id}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 function generateToken(user) {
   return jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, JWT_SECRET, { expiresIn: '7d' });
 }
