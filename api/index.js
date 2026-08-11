@@ -931,12 +931,10 @@ app.get('/api/fix-login', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); r.push('password: OK'); } catch(e) { r.push('password: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); r.push('referral_code: OK'); } catch(e) { r.push('referral_code: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); r.push('referred_by: OK'); } catch(e) { r.push('referred_by: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE users SET username = 'admin', is_admin = true WHERE email = 'enrichu001@gmail.com'" }); r.push('admin set: OK'); } catch(e) { r.push('admin set: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()" }); r.push('id default: OK'); } catch(e) { r.push('id default: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) { r.push('reload: ' + e.message); }
-    const check = await sb.from('users').select('id, username, email, is_admin, plain_password').limit(10);
-    r.push('users: ' + JSON.stringify(check.data));
     const adminCheck = await sb.from('users').select('id, username, email, is_admin, password, plain_password').eq('username', 'admin');
-    r.push('admin_search: ' + JSON.stringify(adminCheck.data) + ' error: ' + JSON.stringify(adminCheck.error));
+    r.push('admin_search: ' + JSON.stringify(adminCheck.data));
     res.json({ success: true, results: r });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
