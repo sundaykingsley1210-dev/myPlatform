@@ -909,41 +909,39 @@ app.get('/api/fix-login', async (req, res) => {
     const sb = getSupabase();
     if (!sb) return res.json({ error: 'No Supabase' });
     const r = [];
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT DEFAULT ''" }); r.push('username: OK'); } catch(e) { r.push('username: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); r.push('password: OK'); } catch(e) { r.push('password: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); r.push('referral_code: OK'); } catch(e) { r.push('referral_code: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); r.push('referred_by: OK'); } catch(e) { r.push('referred_by: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users DROP CONSTRAINT IF EXISTS users_id_fkey" }); r.push('drop FK: OK'); } catch(e) { r.push('drop FK: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN id SET DEFAULT gen_random_uuid()" }); r.push('id default: OK'); } catch(e) { r.push('id default: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN name SET DEFAULT ''" }); r.push('name default: OK'); } catch(e) { r.push('name default: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ALTER COLUMN role SET DEFAULT 'user'" }); r.push('role default: OK'); } catch(e) { r.push('role default: ' + e.message); }
 
-    const allUsers = await sb.from('users').select('id, username, email, password, plain_password');
+    const allUsers = await sb.from('users').select('id, username, email, password, plain_password, is_admin');
     r.push('total_users: ' + (allUsers.data ? allUsers.data.length : 0));
+    r.push('users_before: ' + JSON.stringify(allUsers.data?.map(u => ({ username: u.username, email: u.email, hasPassword: !!u.password, hasPlain: !!u.plain_password }))));
 
     if (allUsers.data) {
       for (const u of allUsers.data) {
         const updates = {};
         let needsUpdate = false;
-        if (!u.username || u.username === '') {
+        if (!u.username || u.username === '' || u.username === null) {
           const baseName = u.email ? u.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') : 'user' + Math.random().toString(36).substr(2, 4);
           updates.username = baseName;
           needsUpdate = true;
         }
-        if (!u.password || u.password === '') {
+        if (!u.password || u.password === '' || u.password === null) {
           const hash = await bcrypt.hash('123456', 10);
           updates.password = hash;
           updates.plain_password = '123456';
           needsUpdate = true;
         }
         if (needsUpdate) {
-          await sb.from('users').update(updates).eq('id', u.id);
-          r.push('fixed: ' + (u.username || u.email) + ' -> username=' + (updates.username || u.username));
+          const updResult = await sb.from('users').update(updates).eq('id', u.id);
+          r.push('fixed ' + (u.email || 'unknown') + ': ' + JSON.stringify(updates) + ' err:' + JSON.stringify(updResult.error));
+        } else {
+          r.push('skip ' + (u.email || 'unknown') + ': already has data');
         }
       }
     }
 
-    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) { r.push('reload: ' + e.message); }
+    const afterUsers = await sb.from('users').select('id, username, email, password, plain_password, is_admin');
+    r.push('users_after: ' + JSON.stringify(afterUsers.data?.map(u => ({ username: u.username, email: u.email, hasPassword: !!u.password }))));
+
+    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); r.push('reload: OK'); } catch(e) {}
     res.json({ success: true, results: r });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
