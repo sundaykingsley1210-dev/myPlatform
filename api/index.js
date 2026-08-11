@@ -172,17 +172,21 @@ app.get('/api/fix-column-types', async (req, res) => {
     const sb = getSupabase();
     if (!sb) return res.status(500).json({ error: 'No Supabase' });
     const results = [];
-    const tables = ['investments', 'transactions', 'task_claims', 'notifications', 'withdrawals', 'savings', 'messages'];
-    for (const t of tables) {
-      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${t} WHERE user_id::text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'` }); results.push(`${t}: cleared non-UUID`); } catch (e) { results.push(`${t}: ${e.message}`); }
-    }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE investments ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('investments: UUID'); } catch (e) { results.push('investments UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE transactions ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('transactions: UUID'); } catch (e) { results.push('transactions UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE task_claims ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('task_claims: UUID'); } catch (e) { results.push('task_claims UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE notifications ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('notifications: UUID'); } catch (e) { results.push('notifications UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('withdrawals: UUID'); } catch (e) { results.push('withdrawals UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE savings ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('savings: UUID'); } catch (e) { results.push('savings UUID: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE messages ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('messages: UUID'); } catch (e) { results.push('messages UUID: ' + e.message); }
+
+    const dropRecreate = async (table) => {
+      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${table}` }); results.push(`${table}: cleared`); } catch (e) { results.push(`${table} clear: ${e.message}`); }
+      try { await sb.rpc('exec_sql', { query: `ALTER TABLE ${table} DROP COLUMN IF EXISTS user_id` }); results.push(`${table}: dropped user_id`); } catch (e) { results.push(`${table} drop: ${e.message}`); }
+      try { await sb.rpc('exec_sql', { query: `ALTER TABLE ${table} ADD COLUMN user_id UUID` }); results.push(`${table}: added user_id UUID`); } catch (e) { results.push(`${table} add: ${e.message}`); }
+    };
+
+    await dropRecreate('investments');
+    await dropRecreate('transactions');
+    await dropRecreate('task_claims');
+    await dropRecreate('notifications');
+    await dropRecreate('withdrawals');
+    await dropRecreate('savings');
+    await dropRecreate('messages');
+
     try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); results.push('schema reloaded'); } catch (e) { results.push('schema reload: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
