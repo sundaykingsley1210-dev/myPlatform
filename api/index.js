@@ -134,33 +134,26 @@ app.get('/api/restore-user', async (req, res) => {
     const sb = getSupabase();
     if (!sb) return res.status(500).json({ error: 'No Supabase' });
 
-    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance, old_user_id } = req.query;
+    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance } = req.query;
     if (!username || !email || !password) return res.status(400).json({ error: 'Missing username, email, or password' });
 
     const hash = await bcrypt.hash(password, 10);
 
     const existing = await sb.from('users').select('id').eq('username', username).single();
+    let userId;
     if (existing.data) {
+      userId = existing.data.id;
       const { error: ue } = await sb.from('users').update({
         email, password: hash, plain_password: password,
         balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
         vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
         bonus_balance: Number(bonus_balance) || 0
-      }).eq('id', existing.data.id);
+      }).eq('id', userId);
       if (ue) return res.status(500).json({ error: ue.message });
-
-      if (old_user_id) {
-        await sb.from('investments').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
-        await sb.from('transactions').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
-        await sb.from('task_claims').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
-        await sb.from('notifications').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
-        await sb.from('withdrawals').update({ user_id: existing.data.id }).eq('user_id', Number(old_user_id));
-      }
-
-      return res.json({ success: true, message: `Updated ${username}`, user_id: existing.data.id });
+      return res.json({ success: true, message: `Updated ${username}`, user_id: userId });
     }
 
-    const userId = crypto.randomUUID();
+    userId = crypto.randomUUID();
     const { error: ue } = await sb.from('users').insert({
       id: userId, username, email, password: hash, plain_password: password,
       balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
@@ -169,15 +162,49 @@ app.get('/api/restore-user', async (req, res) => {
     });
     if (ue) return res.status(500).json({ error: ue.message });
 
-    if (old_user_id) {
-      await sb.from('investments').update({ user_id: userId }).eq('user_id', Number(old_user_id));
-      await sb.from('transactions').update({ user_id: userId }).eq('user_id', Number(old_user_id));
-      await sb.from('task_claims').update({ user_id: userId }).eq('user_id', Number(old_user_id));
-      await sb.from('notifications').update({ user_id: userId }).eq('user_id', Number(old_user_id));
-      await sb.from('withdrawals').update({ user_id: userId }).eq('user_id', Number(old_user_id));
-    }
-
     res.json({ success: true, message: `Created ${username}`, user_id: userId });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/fix-column-types', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+    const results = [];
+    const tables = ['investments', 'transactions', 'task_claims', 'notifications', 'withdrawals', 'savings', 'messages'];
+    for (const t of tables) {
+      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${t} WHERE user_id::text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'` }); results.push(`${t}: cleared non-UUID`); } catch (e) { results.push(`${t}: ${e.message}`); }
+    }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE investments ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('investments: UUID'); } catch (e) { results.push('investments UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE transactions ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('transactions: UUID'); } catch (e) { results.push('transactions UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE task_claims ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('task_claims: UUID'); } catch (e) { results.push('task_claims UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE notifications ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('notifications: UUID'); } catch (e) { results.push('notifications UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('withdrawals: UUID'); } catch (e) { results.push('withdrawals UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE savings ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('savings: UUID'); } catch (e) { results.push('savings UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE messages ALTER COLUMN user_id TYPE UUID USING user_id::text::uuid" }); results.push('messages: UUID'); } catch (e) { results.push('messages UUID: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); results.push('schema reloaded'); } catch (e) { results.push('schema reload: ' + e.message); }
+    res.json({ success: true, results });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/recreate-investments', async (req, res) => {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return res.status(500).json({ error: 'No Supabase' });
+    const { user_id, investments } = req.query;
+    if (!user_id || !investments) return res.status(400).json({ error: 'Missing user_id or investments' });
+    const invData = JSON.parse(investments);
+    const results = [];
+    for (const inv of invData) {
+      const { error } = await sb.from('investments').insert({
+        user_id, vip_level: inv.vip_level, amount: inv.amount, daily_return: inv.daily_return,
+        status: inv.status || 'active', total_collected: inv.total_collected || 0, days_collected: inv.days_collected || 0
+      });
+      results.push(error ? error.message : `VIP${inv.vip_level} inserted`);
+    }
+    res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
