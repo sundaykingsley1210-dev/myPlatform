@@ -120,11 +120,14 @@ app.get('/api/debug-db', async (req, res) => {
   for (const t of tables) {
     try {
       const r = await sb.from(t).select('*').limit(1);
-      results[t] = { exists: !r.error, error: r.error ? r.error.message : null, count: r.data ? r.data.length : 0 };
+      results[t] = { exists: !r.error, error: r.error ? r.error.message : null, count: r.data ? r.data.length : 0, sample: r.data && r.data[0] ? Object.keys(r.data[0]) : [] };
     } catch (e) {
       results[t] = { exists: false, error: e.message };
     }
   }
+
+  const userQ = await sb.from('users').select('id, username, password, plain_password, is_admin, email').eq('username', 'admin').single();
+  results.adminQuery = { data: userQ.data, error: userQ.error ? userQ.error.message : null };
 
   res.json({ connected: true, isSupabase: isSupabase(), results });
 });
