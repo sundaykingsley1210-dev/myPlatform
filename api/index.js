@@ -212,6 +212,10 @@ app.post('/api/login', async (req, res) => {
     if (!result.data && username.includes('@')) {
       result = await dbQuery('users', '*', { email: username }, { single: true });
     }
+    if (!result.data) {
+      const emailResult = await dbQuery('users', '*', { email: username }, { single: true });
+      if (emailResult.data) result = emailResult;
+    }
     if (!result.data) return res.status(400).json({ error: 'Invalid username/email or password' });
 
     const user = result.data;
@@ -906,21 +910,16 @@ app.get('/api/migrate', async (req, res) => {
     try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT DEFAULT \'\'' }); results.push('withdrawals.confirmed_at added'); } catch (e) { results.push('withdrawals.confirmed_at: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
     try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 150 WHERE vip_level = 1 AND status = 'active'" }); results.push('VIP 1 daily_return updated to 150'); } catch (e) { results.push('VIP 1 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 450 WHERE vip_level = 2 AND status = 'active'" }); results.push('VIP 2 daily_return updated to 450'); } catch (e) { results.push('VIP 2 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 1350 WHERE vip_level = 3 AND status = 'active'" }); results.push('VIP 3 daily_return updated to 1350'); } catch (e) { results.push('VIP 3 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 2700 WHERE vip_level = 4 AND status = 'active'" }); results.push('VIP 4 daily_return updated to 2700'); } catch (e) { results.push('VIP 4 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 4050 WHERE vip_level = 5 AND status = 'active'" }); results.push('VIP 5 daily_return updated to 4050'); } catch (e) { results.push('VIP 5 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 6000 WHERE vip_level = 6 AND status = 'active'" }); results.push('VIP 6 daily_return updated to 6000'); } catch (e) { results.push('VIP 6 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 10000 WHERE vip_level = 7 AND status = 'active'" }); results.push('VIP 7 daily_return updated to 10000'); } catch (e) { results.push('VIP 7 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 11500 WHERE vip_level = 8 AND status = 'active'" }); results.push('VIP 8 daily_return updated to 11500'); } catch (e) { results.push('VIP 8 update: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE investments SET daily_return = 14000 WHERE vip_level = 9 AND status = 'active'" }); results.push('VIP 9 daily_return updated to 14000'); } catch (e) { results.push('VIP 9 update: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT DEFAULT ''" }); results.push('users.username added'); } catch (e) { results.push('users.username: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); results.push('users.password added'); } catch (e) { results.push('users.password: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "UPDATE users SET username = 'admin' WHERE email = 'enrichu001@gmail.com' AND (username IS NULL OR username = '')" }); results.push('admin username set'); } catch (e) { results.push('admin username set: ' + e.message); }
     try { await sb.rpc('exec_sql', { query: "UPDATE users SET is_admin = true WHERE email = 'enrichu001@gmail.com'" }); results.push('admin flag set'); } catch (e) { results.push('admin flag set: ' + e.message); }
+    try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS approved_at TEXT DEFAULT ''" }); results.push('withdrawals.approved_at added'); } catch (e) { results.push('withdrawals.approved_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT DEFAULT ''" }); results.push('withdrawals.confirmed_at added'); } catch (e) { results.push('withdrawals.confirmed_at: ' + e.message); }
+    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); results.push('schema reloaded'); } catch (e) { results.push('schema reload: ' + e.message); }
     res.json({ success: true, results });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
