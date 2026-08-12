@@ -1477,15 +1477,18 @@ app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, re
 });
 
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { nickname, email, phone } = req.body;
+  const { nickname, email, phone, vip_level, balance } = req.body;
   const target = await dbQuery('users', 'username', { id: req.params.id }, { single: true });
   if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot edit the main admin account' });
   const allowedFields = {};
   if (nickname !== undefined) allowedFields.nickname = nickname;
   if (email !== undefined) allowedFields.email = email;
   if (phone !== undefined) allowedFields.phone = phone;
+  if (vip_level !== undefined && vip_level !== null) allowedFields.vip_level = parseInt(vip_level) || 0;
+  if (balance !== undefined && balance !== null) allowedFields.balance = parseFloat(balance) || 0;
   try {
     await dbUpdate('users', allowedFields, { id: req.params.id });
+    await dbInsert('notifications', { user_id: req.params.id, title: 'Account Updated', message: `Admin updated your account. ${vip_level !== undefined ? 'VIP Level: ' + vip_level + '. ' : ''}${balance !== undefined ? 'Balance: ₦' + Number(balance).toLocaleString() + '.' : ''}` });
     res.json({ success: true, message: 'User updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

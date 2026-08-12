@@ -261,6 +261,7 @@
         const data = await res.json();
         const list = document.getElementById('usersList');
         if (!data.users || !data.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><h3>No Users</h3></div>'; return; }
+        window._allUsers = data.users;
         let html = '';
         data.users.forEach(u => {
           const displayName = u.nickname || u.username;
@@ -699,12 +700,18 @@
       const card = document.createElement('div');
       card.className = 'vip-detail-card';
       card.id = 'editUserCard';
+      const allUsers = window._allUsers || [];
+      const u = allUsers.find(x => String(x.id) === String(id));
+      const curVip = u ? (u.vip_level || 0) : 0;
+      const curBal = u ? (u.balance || 0) : 0;
       card.innerHTML = `<h3 style="margin-bottom:16px;"><i class="fas fa-pen" style="color:var(--primary);margin-right:8px;"></i> Edit User: ${name}</h3>
         <div class="form-group"><label>Nickname</label><input type="text" id="editNickname" value="${nickname}"></div>
         <div class="form-group"><label>Email</label><input type="email" id="editEmail" value="${email}"></div>
         <div class="form-group"><label>Phone</label><input type="tel" id="editPhone" value="${phone}"></div>
+        <div class="form-group"><label>VIP Level (1-24, current: ${curVip || 'None'})</label><input type="number" id="editVipLevel" min="0" max="24" value="${curVip}"></div>
+        <div class="form-group"><label>Balance (₦)</label><input type="number" id="editBalance" min="0" value="${curBal}"></div>
         <div style="display:flex;gap:8px;">
-          <button class="btn btn-primary" onclick="saveUserEdit(${id})"><i class="fas fa-save"></i> Save</button>
+          <button class="btn btn-primary" onclick="saveUserEdit('${id}')"><i class="fas fa-save"></i> Save</button>
           <button class="btn btn-outline" onclick="document.getElementById('editUserCard').remove()"><i class="fas fa-times"></i> Cancel</button>
         </div>`;
       area.prepend(card);
@@ -715,7 +722,9 @@
         const res = await API('/api/admin/edit-user/' + id, { method: 'POST', body: JSON.stringify({
           nickname: document.getElementById('editNickname').value,
           email: document.getElementById('editEmail').value,
-          phone: document.getElementById('editPhone').value
+          phone: document.getElementById('editPhone').value,
+          vip_level: parseInt(document.getElementById('editVipLevel').value) || 0,
+          balance: parseFloat(document.getElementById('editBalance').value) || 0
         })});
         const data = await res.json();
         if (res.ok) { showToast('User updated', 'success'); document.getElementById('editUserCard').remove(); loadUsers(); }
