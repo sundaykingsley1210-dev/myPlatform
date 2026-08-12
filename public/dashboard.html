@@ -423,7 +423,7 @@
               onSuccess: function(transaction) {
                 updateTracker('verifying');
                 showToast('Payment successful! Verifying...', 'success');
-                verifyPayment(pd.reference);
+                startAutoVerify(pd.reference);
               },
               onClose: function() {
                 showToast('Payment cancelled', 'error');
@@ -462,7 +462,7 @@
               </div>`;
             btn.style.display = 'none';
             startCountdown();
-            startAutoVerify(pd.reference);
+            updateTracker('initiated');
             return;
           }
 
