@@ -405,35 +405,38 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
     if (currentVip > 0 && parseInt(vipLevel) <= currentVip) return res.status(400).json({ error: `Cannot invest in VIP ${vipLevel}. You are already VIP ${currentVip}. Choose a higher level.` });
 
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    let accountDetails = null;
+    let access_code = null;
+    let authorization_url = null;
+    let psError = null;
 
-    if (paystackConfigured) {
-      try {
-        const psRes = await axios.post('https://api.paystack.co/transaction/initialize', {
-          amount: plan.amount * 100,
-          email: `${req.username}@enrichu.com`,
-          reference: ref,
-          callback_url: `${SITE_URL}/dashboard.html`,
-          metadata: { vipLevel: parseInt(vipLevel), userId: req.userId }
-        }, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, 'Content-Type': 'application/json' } });
-        if (psRes.data?.status) {
-          accountDetails = { authorization_url: psRes.data.data.authorization_url, access_code: psRes.data.data.access_code, reference: ref };
-        }
-      } catch (e) { console.log('Paystack init error:', e.message); }
+    if (!paystackConfigured) return res.status(500).json({ error: 'Payment system not configured. Contact support.' });
+
+    try {
+      const psRes = await axios.post('https://api.paystack.co/transaction/initialize', {
+        amount: plan.amount * 100,
+        email: req.userEmail || `${req.username}@enrichu.com`,
+        reference: ref,
+        callback_url: `${SITE_URL}/dashboard.html`,
+        metadata: { vip_level: parseInt(vipLevel), userId: req.userId }
+      }, { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}`, 'Content-Type': 'application/json' } });
+      if (psRes.data?.status) {
+        access_code = psRes.data.data.access_code;
+        authorization_url = psRes.data.data.authorization_url;
+      } else {
+        psError = psRes.data?.message || 'Paystack returned false status';
+      }
+    } catch (e) {
+      psError = e.response?.data?.message || e.message;
+      console.log('Paystack init error:', psError, JSON.stringify(e.response?.data));
     }
 
-    if (!accountDetails) {
-      const banks = ['Wema Bank', 'Sterling Bank', 'Kuda Bank', 'VBank'];
-      accountDetails = {
-        accountNumber: `${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-        bankName: banks[Math.floor(Math.random() * banks.length)],
-        accountName: `EnrichU-${req.username}`
-      };
+    if (!access_code) {
+      return res.status(500).json({ error: `Payment initialization failed: ${psError || 'Unknown error'}. Please try again.` });
     }
 
-    await dbInsert('transactions', { user_id: req.userId, type: 'investment', vip_level: parseInt(vipLevel), amount: plan.amount, status: 'pending', reference: ref, bank_name: accountDetails.bankName || 'Paystack', account_number: accountDetails.accountNumber || '0000000000', account_name: accountDetails.accountName || `EnrichU-${req.username}` });
+    await dbInsert('transactions', { user_id: req.userId, type: 'investment', vip_level: parseInt(vipLevel), amount: plan.amount, status: 'pending', reference: ref, bank_name: 'Paystack', account_number: '0000000000', account_name: `EnrichU-${req.username}` });
 
-    res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, bankName: accountDetails.bankName || 'Paystack', accountNumber: accountDetails.accountNumber || '0000000000', accountName: accountDetails.accountName || `EnrichU-${req.username}`, vipLevel, authorization_url: accountDetails.authorization_url || null, access_code: accountDetails.access_code || null, paystack: paystackConfigured, paystackKey: PAYSTACK_PUBLIC } });
+    res.json({ success: true, message: 'Payment details generated.', paymentDetails: { reference: ref, amount: plan.amount, vipLevel, authorization_url, access_code, paystack: true, paystackKey: PAYSTACK_PUBLIC } });
   } catch (err) { res.status(500).json({ error: 'Failed: ' + err.message }); }
 });
 
