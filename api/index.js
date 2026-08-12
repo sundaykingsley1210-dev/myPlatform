@@ -501,9 +501,10 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
     // Create new investment
     await dbInsert('investments', { user_id: tx.user_id, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
 
-    // Update user's VIP level + deduct investment amount from wallet
-    const userBal3 = await dbQuery('users', 'balance', { id: tx.user_id }, { single: true });
-    await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: tx.vip_level }, { id: tx.user_id });
+    // Update user's VIP level (don't downgrade if admin set higher) + deduct investment amount
+    const userBal3 = await dbQuery('users', 'balance, vip_level', { id: tx.user_id }, { single: true });
+    const newVipLevel = Math.max(userBal3.data.vip_level || 0, tx.vip_level);
+    await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: newVipLevel }, { id: tx.user_id });
 
     const msg = refundAmount > 0
       ? `Your payment of ₦${tx.amount.toLocaleString()} is approved! ₦${tx.amount.toLocaleString()} has been credited to your account and VIP ${tx.vip_level} has been activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
@@ -818,9 +819,10 @@ app.post('/api/admin/transaction/:id/approve', requireAuth, requireAdmin, async 
     // Create new investment
     await dbInsert('investments', { user_id: tx.user_id, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
 
-    // Update user's VIP level + deduct investment amount from wallet
-    const userBal3 = await dbQuery('users', 'balance', { id: tx.user_id }, { single: true });
-    await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: tx.vip_level }, { id: tx.user_id });
+    // Update user's VIP level (don't downgrade if admin set higher) + deduct investment amount
+    const userBal3 = await dbQuery('users', 'balance, vip_level', { id: tx.user_id }, { single: true });
+    const newVipLevel = Math.max(userBal3.data.vip_level || 0, tx.vip_level);
+    await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: newVipLevel }, { id: tx.user_id });
 
     const msg = refundAmount > 0
       ? `Your payment of ₦${tx.amount.toLocaleString()} is approved! ₦${tx.amount.toLocaleString()} has been credited to your account and VIP ${tx.vip_level} has been activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
