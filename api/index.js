@@ -1476,6 +1476,48 @@ app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/admin/edit-investment/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const invId = parseInt(req.params.id);
+    const { amount, vip_level } = req.body;
+    const invResult = await dbQuery('investments', 'id, user_id, vip_level, amount', { id: invId }, { single: true });
+    if (!invResult.data) return res.status(404).json({ error: 'Investment not found' });
+    const inv = invResult.data;
+
+    const updateData = {};
+    if (amount !== undefined && amount !== null) {
+      const a = parseFloat(amount);
+      if (isNaN(a) || a <= 0) return res.status(400).json({ error: 'Invalid amount' });
+      updateData.amount = a;
+    }
+    if (vip_level !== undefined && vip_level !== null) {
+      const v = parseInt(vip_level) || 0;
+      if (v < 1 || v > 24) return res.status(400).json({ error: 'VIP level must be 1-24' });
+      const plan = VIP_PLANS[v];
+      if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
+      updateData.vip_level = v;
+      updateData.daily_return = plan.dailyReturn;
+    }
+
+    if (Object.keys(updateData).length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+    await dbUpdate('investments', updateData, { id: invId });
+
+    // If VIP level increased, update user's vip_level (do not auto-downgrade)
+    if (updateData.vip_level) {
+      const userRes = await dbQuery('users', 'vip_level', { id: inv.user_id }, { single: true });
+      const cur = userRes.data ? (userRes.data.vip_level || 0) : 0;
+      if (updateData.vip_level > cur) {
+        await dbUpdate('users', { vip_level: updateData.vip_level }, { id: inv.user_id });
+      }
+    }
+
+    await dbInsert('notifications', { user_id: inv.user_id, title: 'Investment Updated', message: `Admin updated your investment (VIP ${inv.vip_level} → ${updateData.vip_level || inv.vip_level}, Amount: ₦${Number(inv.amount).toLocaleString()} → ₦${Number(updateData.amount || inv.amount).toLocaleString()})` });
+
+    res.json({ success: true, message: 'Investment updated' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
   const { nickname, email, phone, vip_level, balance } = req.body;
   const target = await dbQuery('users', 'username', { id: req.params.id }, { single: true });

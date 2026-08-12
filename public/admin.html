@@ -285,11 +285,11 @@
               <div class="invest-detail"><div class="label">Referral</div><div class="val" style="font-size:0.75rem;">${u.referral_code || 'N/A'}</div></div>
             </div>
             ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-              <button class="btn btn-accent btn-sm" onclick="creditBalance(${u.id},'${displayName}')"><i class="fas fa-plus-circle"></i> Credit</button>
-              <button class="btn btn-outline btn-sm" onclick="adminUpgradeVip(${u.id},'${displayName}')" style="border-color:#a855f7;color:#a855f7;"><i class="fas fa-crown"></i> VIP</button>
-              <button class="btn btn-outline btn-sm" onclick="editUser(${u.id},'${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
-              <button class="btn btn-outline btn-sm" onclick="resetUserPassword(${u.id},'${displayName}')" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-key"></i> Reset Password</button>
-              <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id},'${displayName}')"><i class="fas fa-trash"></i> Delete</button>
+              <button class="btn btn-accent btn-sm" onclick="creditBalance('${u.id}','${displayName}')"><i class="fas fa-plus-circle"></i> Credit</button>
+              <button class="btn btn-outline btn-sm" onclick="adminUpgradeVip('${u.id}','${displayName}')" style="border-color:#a855f7;color:#a855f7;"><i class="fas fa-crown"></i> VIP</button>
+              <button class="btn btn-outline btn-sm" onclick="editUser('${u.id}','${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
+              <button class="btn btn-outline btn-sm" onclick="resetUserPassword('${u.id}','${displayName}')" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-key"></i> Reset Password</button>
+              <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${displayName}')"><i class="fas fa-trash"></i> Delete</button>
             </div>` : `<div style="margin-top:12px;text-align:center;"><span style="color:var(--primary);font-size:0.82rem;"><i class="fas fa-shield-alt"></i> Protected — admin account cannot be edited or deleted</span></div>`}
           </div>`;
         });
@@ -415,7 +415,7 @@
               <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.days_collected}</div></div>
               <div class="invest-detail"><div class="label">Since</div><div class="val">${new Date(inv.created_at).toLocaleDateString()}</div></div>
             </div>
-            ${inv.status === 'active' ? '<div style="margin-top:12px;"><button class="btn btn-danger btn-sm" onclick="deleteInvestment(' + inv.id + ',\'' + displayName + '\',VIP ' + inv.vip_level + ')"><i class="fas fa-trash"></i> Delete</button></div>' : ''}
+                ${inv.status === 'active' ? '<div style="margin-top:12px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="editInvestment(' + inv.id + ',\'' + displayName + '\',' + inv.vip_level + ',' + inv.amount + ')"><i class="fas fa-pen"></i> Edit</button><button class="btn btn-danger btn-sm" onclick="deleteInvestment(' + inv.id + ',\'' + displayName + '\',VIP ' + inv.vip_level + ')"><i class="fas fa-trash"></i> Delete</button></div>' : ''}
           </div>`;
         });
         list.innerHTML = html;
@@ -429,6 +429,32 @@
         if (res.ok) { showToast('Investment deleted', 'success'); loadAdminInvestments(); }
         else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
       } catch (e) { showToast('Error', 'error'); }
+    }
+
+    function editInvestment(id, user, vip, amount) {
+      const area = document.getElementById('investmentsList');
+      const card = document.createElement('div');
+      card.className = 'vip-detail-card';
+      card.id = 'editInvestmentCard';
+      card.innerHTML = `<h3 style="margin-bottom:16px;"><i class="fas fa-pen" style="color:var(--primary);margin-right:8px;"></i> Edit Investment: ${user}</h3>
+        <div class="form-group"><label>VIP Level (1-24)</label><input type="number" id="editInvVip" min="1" max="24" value="${vip}"></div>
+        <div class="form-group"><label>Amount (₦)</label><input type="number" id="editInvAmount" min="0" value="${amount}"></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary" onclick="saveInvestmentEdit('${id}')"><i class="fas fa-save"></i> Save</button>
+          <button class="btn btn-outline" onclick="document.getElementById('editInvestmentCard').remove()"><i class="fas fa-times"></i> Cancel</button>
+        </div>`;
+      area.prepend(card);
+    }
+
+    async function saveInvestmentEdit(id) {
+      const vip = parseInt(document.getElementById('editInvVip').value) || 0;
+      const amount = parseFloat(document.getElementById('editInvAmount').value) || 0;
+      try {
+        const res = await API('/api/admin/edit-investment/' + id, { method: 'POST', body: JSON.stringify({ vip_level: vip, amount }) });
+        const data = await res.json();
+        if (res.ok) { showToast('Investment updated', 'success'); document.getElementById('editInvestmentCard').remove(); loadAdminInvestments(); }
+        else showToast(data.error || 'Failed', 'error');
+      } catch (err) { showToast('Failed', 'error'); }
     }
 
     async function loadAdminSavings() {
