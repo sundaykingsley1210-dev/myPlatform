@@ -921,10 +921,10 @@ app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (r
 app.post('/api/admin/user/:id/toggle-admin', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await dbQuery('users', 'is_admin, username', { id: parseInt(id) }, { single: true });
+    const user = await dbQuery('users', 'is_admin, username', { id }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot change admin status of the main admin account' });
-    await dbUpdate('users', { is_admin: !user.data.is_admin }, { id: parseInt(id) });
+    await dbUpdate('users', { is_admin: !user.data.is_admin }, { id });
     res.json({ success: true, message: 'Admin status toggled' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -955,13 +955,13 @@ app.get('/api/admin/reset-requests', requireAuth, requireAdmin, async (req, res)
 
 app.post('/api/admin/approve-reset/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: parseInt(req.params.id) }, { single: true });
+    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: req.params.id }, { single: true });
     if (!request.data) return res.status(404).json({ error: 'Request not found' });
     if (request.data.status !== 'pending') return res.status(400).json({ error: 'Request already processed' });
     const defaultPass = '123456';
     const hashed = await bcrypt.hash(defaultPass, 10);
     await dbUpdate('users', { password: hashed }, { id: request.data.user_id });
-    await dbUpdate('reset_requests', { status: 'approved' }, { id: parseInt(req.params.id) });
+    await dbUpdate('reset_requests', { status: 'approved' }, { id: req.params.id });
     await dbInsert('notifications', { user_id: request.data.user_id, title: 'Password Reset', message: 'Your password has been reset by admin. Your new default password is 123456. Please login and change it immediately.' });
     res.json({ success: true, message: `Password reset for ${request.data.username}. Default password: ${defaultPass}` });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -969,9 +969,9 @@ app.post('/api/admin/approve-reset/:id', requireAuth, requireAdmin, async (req, 
 
 app.post('/api/admin/reject-reset/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: parseInt(req.params.id) }, { single: true });
+    const request = await dbQuery('reset_requests', 'id, user_id, username', { id: req.params.id }, { single: true });
     if (!request.data) return res.status(404).json({ error: 'Request not found' });
-    await dbUpdate('reset_requests', { status: 'rejected' }, { id: parseInt(req.params.id) });
+    await dbUpdate('reset_requests', { status: 'rejected' }, { id: req.params.id });
     await dbInsert('notifications', { user_id: request.data.user_id, title: 'Password Reset Denied', message: 'Your password reset request was denied by admin. Please contact support for help.' });
     res.json({ success: true, message: 'Request rejected' });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1459,7 +1459,7 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
 
 app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, res) => {
   const { vipLevel } = req.body;
-  const userId = parseInt(req.params.id);
+  const userId = req.params.id;
   if (!vipLevel || vipLevel < 1 || vipLevel > 24) return res.status(400).json({ error: 'Valid VIP level (1-24) required' });
   try {
     const user = await dbQuery('users', 'id, username, vip_level', { id: userId }, { single: true });
@@ -1478,14 +1478,14 @@ app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, re
 
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
   const { nickname, email, phone } = req.body;
-  const target = await dbQuery('users', 'username', { id: parseInt(req.params.id) }, { single: true });
+  const target = await dbQuery('users', 'username', { id: req.params.id }, { single: true });
   if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot edit the main admin account' });
   const allowedFields = {};
   if (nickname !== undefined) allowedFields.nickname = nickname;
   if (email !== undefined) allowedFields.email = email;
   if (phone !== undefined) allowedFields.phone = phone;
   try {
-    await dbUpdate('users', allowedFields, { id: parseInt(req.params.id) });
+    await dbUpdate('users', allowedFields, { id: req.params.id });
     res.json({ success: true, message: 'User updated' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1494,15 +1494,15 @@ app.post('/api/admin/reset-password/:id', requireAuth, requireAdmin, async (req,
   const { newPassword } = req.body;
   if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
   try {
-    const user = await dbQuery('users', 'id, username', { id: parseInt(req.params.id) }, { single: true });
+    const user = await dbQuery('users', 'id, username', { id: req.params.id }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     if (user.data.username === 'admin') return res.status(400).json({ error: 'Cannot reset the main admin password' });
     const hashed = await bcrypt.hash(newPassword, 10);
-    const updateResult = await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: parseInt(req.params.id) });
+    const updateResult = await dbUpdate('users', { password: hashed, plain_password: newPassword }, { id: req.params.id });
     if (updateResult.error) {
-      await dbUpdate('users', { password: hashed }, { id: parseInt(req.params.id) });
+      await dbUpdate('users', { password: hashed }, { id: req.params.id });
     }
-    await dbInsert('notifications', { user_id: parseInt(req.params.id), title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
+    await dbInsert('notifications', { user_id: req.params.id, title: 'Password Reset', message: 'Admin has reset your password. Please login with your new password.' });
     res.json({ success: true, message: `Password reset for ${user.data.username}` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1541,7 +1541,7 @@ app.post('/api/admin/clear-all', requireAuth, requireAdmin, async (req, res) => 
 
 app.post('/api/admin/delete-user/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const userId = parseInt(req.params.id);
+    const userId = req.params.id;
     const target = await dbQuery('users', 'username', { id: userId }, { single: true });
     if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot delete the main admin account' });
     if (isSupabase()) {
