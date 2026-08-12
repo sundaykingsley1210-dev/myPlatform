@@ -334,12 +334,13 @@ app.post('/api/login', async (req, res) => {
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
 
   try {
-    let result = await dbQuery('users', '*', { username }, { single: true });
+    const loginCols = 'id, username, email, password, plain_password, balance, total_earned, vip_level, is_admin, nickname, avatar_url, earnings_balance, bonus_balance, bonus_date, created_at, referral_code, referred_by';
+    let result = await dbQuery('users', loginCols, { username }, { single: true });
     if (!result.data && username.includes('@')) {
-      result = await dbQuery('users', '*', { email: username }, { single: true });
+      result = await dbQuery('users', loginCols, { email: username }, { single: true });
     }
     if (!result.data) {
-      const emailResult = await dbQuery('users', '*', { email: username }, { single: true });
+      const emailResult = await dbQuery('users', loginCols, { email: username }, { single: true });
       if (emailResult.data) result = emailResult;
     }
     if (!result.data) return res.status(400).json({ error: 'Invalid username/email or password' });
@@ -362,7 +363,8 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/me', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('users', '*', { id: req.userId }, { single: true });
+    const meCols = 'id, username, email, balance, total_earned, vip_level, is_admin, nickname, avatar_url, earnings_balance, bonus_balance, bonus_date, created_at, referral_code, referred_by, plain_password';
+    const result = await dbQuery('users', meCols, { id: req.userId }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'User not found' });
     const u = result.data;
     res.json({ user: { id: u.id, username: u.username, balance: u.balance || 0, totalEarned: u.total_earned || 0, email: u.email || '', isAdmin: u.is_admin || false, nickname: u.nickname || '', avatarUrl: u.avatar_url || '', vipLevel: u.vip_level || 0, createdAt: u.created_at || '', bonusBalance: parseFloat(u.bonus_balance) || 0, bonusDate: u.bonus_date || '', earningsBalance: parseFloat(u.earnings_balance) || 0 } });
