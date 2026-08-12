@@ -1025,8 +1025,7 @@ app.get('/api/config-status', (req, res) => {
   res.json({
     paystack: paystackConfigured ? 'configured' : 'not configured',
     vatRate: (VAT_RATE * 100) + '%',
-    siteUrl: SITE_URL,
-    monnifyUrl: MONNIFY_BASE_URL
+    siteUrl: SITE_URL
   });
 });
 
