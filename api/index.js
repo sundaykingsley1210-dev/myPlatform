@@ -400,8 +400,8 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
   if (!plan) return res.status(400).json({ error: 'Invalid VIP level' });
 
   try {
-    const userRes = await dbQuery('users', 'vip_level', { id: req.userId }, { single: true });
-    const currentVip = userRes.data ? (userRes.data.vip_level || 0) : 0;
+    const userRes2 = await dbQuery('users', 'vip_level, email', { id: req.userId }, { single: true });
+    const currentVip = userRes2.data ? (userRes2.data.vip_level || 0) : 0;
     if (currentVip > 0 && parseInt(vipLevel) <= currentVip) return res.status(400).json({ error: `Cannot invest in VIP ${vipLevel}. You are already VIP ${currentVip}. Choose a higher level.` });
 
     const ref = `ENRICH-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
@@ -411,10 +411,12 @@ app.post('/api/create-investment', requireAuth, async (req, res) => {
 
     if (!paystackConfigured) return res.status(500).json({ error: 'Payment system not configured. Contact support.' });
 
+    const userEmail = (userRes2.data && userRes2.data.email) ? userRes2.data.email : `${req.username}@enrichu.com`;
+
     try {
       const psRes = await axios.post('https://api.paystack.co/transaction/initialize', {
         amount: plan.amount * 100,
-        email: req.userEmail || `${req.username}@enrichu.com`,
+        email: userEmail,
         reference: ref,
         callback_url: `${SITE_URL}/dashboard.html`,
         metadata: { vip_level: parseInt(vipLevel), userId: req.userId }
