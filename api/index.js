@@ -134,7 +134,7 @@ app.get('/api/restore-user', async (req, res) => {
     const sb = getSupabase();
     if (!sb) return res.status(500).json({ error: 'No Supabase' });
 
-    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance } = req.query;
+    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance, is_admin } = req.query;
     if (!username || !email || !password) return res.status(400).json({ error: 'Missing username, email, or password' });
 
     const hash = await bcrypt.hash(password, 10);
@@ -147,7 +147,7 @@ app.get('/api/restore-user', async (req, res) => {
         email, password: hash, plain_password: password,
         balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
         vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
-        bonus_balance: Number(bonus_balance) || 0
+        bonus_balance: Number(bonus_balance) || 0, is_admin: is_admin === 'true'
       }).eq('id', userId);
       if (ue) return res.status(500).json({ error: ue.message });
       return res.json({ success: true, message: `Updated ${username}`, user_id: userId });
@@ -158,7 +158,7 @@ app.get('/api/restore-user', async (req, res) => {
       id: userId, username, email, password: hash, plain_password: password,
       balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
       vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
-      bonus_balance: Number(bonus_balance) || 0, is_admin: false
+      bonus_balance: Number(bonus_balance) || 0, is_admin: is_admin === 'true'
     });
     if (ue) return res.status(500).json({ error: ue.message });
 
