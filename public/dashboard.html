@@ -12,7 +12,7 @@
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <title>Dashboard - Enrich U</title>
-  <link rel="stylesheet" href="/css/style.css?v=16">
+  <link rel="stylesheet" href="/css/style.css?v=17">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://js.paystack.co/v1/inline.js"></script>
@@ -422,7 +422,7 @@
 
           const handler = PaystackPop.setup({
             key: pd.paystackKey,
-            email: (pd.accountName || 'user@enrichu.com').replace('EnrichU-', '') + '@enrichu.com',
+            email: userData.email || 'user@enrichu.com',
             amount: pd.amount * 100,
             currency: 'NGN',
             ref: pd.reference,
@@ -475,7 +475,7 @@
           btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
         }
       } catch (err) {
-        showToast('Network error', 'error');
+        showToast('Network error: ' + (err.message || 'Please try again'), 'error');
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-money-bill-transfer"></i> Proceed to Payment';
       }
