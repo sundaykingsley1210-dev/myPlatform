@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const path = require('path');
-const { initDatabase, dbQuery, dbInsert, dbUpdate, isSupabase } = require('../database');
+const { initDatabase, dbQuery, dbInsert, dbUpdate, dbDelete, isSupabase } = require('../database');
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'enrich-u-jwt-secret-2026';
@@ -1205,7 +1205,7 @@ app.post('/api/admin/delete-investment/:id', requireAuth, requireAdmin, async (r
     if (!result.data) return res.status(404).json({ error: 'Investment not found' });
 
     const inv = result.data;
-    await dbUpdate('investments', { status: 'deleted' }, { id });
+    await dbDelete('investments', { id });
 
     await dbInsert('notifications', { user_id: inv.user_id, title: 'Investment Removed', message: `Your VIP ${inv.vip_level} investment (₦${Number(inv.amount).toLocaleString()}) has been removed by admin.` });
 
@@ -1225,7 +1225,7 @@ app.post('/api/admin/delete-user-investments', requireAuth, requireAdmin, async 
 
     let totalRefund = 0;
     for (const inv of activeInvs.data) {
-      await dbUpdate('investments', { status: 'deleted' }, { id: inv.id });
+      await dbDelete('investments', { id: inv.id });
       totalRefund += Number(inv.amount) || 0;
     }
 
