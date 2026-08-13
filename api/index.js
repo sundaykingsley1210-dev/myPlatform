@@ -1212,6 +1212,39 @@ app.post('/api/admin/delete-investment/:id', requireAuth, requireAdmin, async (r
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/admin/delete-user-investments', requireAuth, requireAdmin, async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    const target = await dbQuery('users', 'username', { id: userId }, { single: true });
+    if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot delete admin investments' });
+
+    const activeInvs = await dbQuery('investments', 'id, vip_level, amount, status', { user_id: userId, status: 'active' });
+    if (!activeInvs.data || activeInvs.data.length === 0) return res.status(400).json({ error: 'No active investments found for this user' });
+
+    let totalRefund = 0;
+    for (const inv of activeInvs.data) {
+      await dbUpdate('investments', { status: 'deleted' }, { id: inv.id });
+      totalRefund += Number(inv.amount) || 0;
+    }
+
+    if (totalRefund > 0) {
+      const userRes = await dbQuery('users', 'balance, vip_level', { id: userId }, { single: true });
+      const newBal = (userRes.data.balance || 0) + totalRefund;
+      const remainingActive = await dbQuery('investments', 'vip_level', { user_id: userId, status: 'active' });
+      const newVip = (remainingActive.data && remainingActive.data.length > 0)
+        ? Math.max(...remainingActive.data.map(i => i.vip_level || 0))
+        : 0;
+      await dbUpdate('users', { balance: newBal, vip_level: newVip }, { id: userId });
+    }
+
+    const invCount = activeInvs.data.length;
+    await dbInsert('notifications', { user_id: userId, title: 'Investments Removed', message: `Admin removed ${invCount} investment(s). ₦${totalRefund.toLocaleString()} has been refunded to your wallet.` });
+
+    res.json({ success: true, message: `${invCount} investment(s) deleted. ₦${totalRefund.toLocaleString()} refunded.`, deletedCount: invCount, refundAmount: totalRefund });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ===================== ADMIN ACTIVITY LOG =====================
 app.get('/api/admin/activity-log', requireAuth, requireAdmin, async (req, res) => {
   try {
