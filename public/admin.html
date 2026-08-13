@@ -416,7 +416,7 @@
               <div class="invest-detail"><div class="label">Days</div><div class="val">${inv.days_collected}</div></div>
               <div class="invest-detail"><div class="label">Since</div><div class="val">${new Date(inv.created_at).toLocaleDateString()}</div></div>
             </div>
-                ${inv.status === 'active' ? '<div style="margin-top:12px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="editInvestment(' + inv.id + ',\'' + displayName + '\',' + inv.vip_level + ',' + inv.amount + ')"><i class="fas fa-pen"></i> Edit</button><button class="btn btn-danger btn-sm" onclick="deleteInvestment(' + inv.id + ',\'' + displayName + '\',VIP ' + inv.vip_level + ')"><i class="fas fa-trash"></i> Delete</button></div>' : ''}
+                ${inv.status === 'active' ? '<div style="margin-top:12px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="editInvestment(' + inv.id + ',\'' + displayName + '\',' + inv.vip_level + ',' + inv.amount + ')"><i class="fas fa-pen"></i> Edit</button><button class="btn btn-danger btn-sm" onclick="deleteInvestment(' + inv.id + ',\'' + displayName + '\',\'VIP ' + inv.vip_level + '\')"><i class="fas fa-trash"></i> Delete</button></div>' : ''}
           </div>`;
         });
         list.innerHTML = html;
