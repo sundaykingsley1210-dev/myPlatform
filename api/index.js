@@ -1328,6 +1328,22 @@ app.post('/api/admin/upgrade-vip/:id', requireAuth, requireAdmin, async (req, re
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/admin/create-investment', requireAuth, requireAdmin, async (req, res) => {
+  const { userId, vipLevel } = req.body;
+  if (!userId || !vipLevel) return res.status(400).json({ error: 'userId and vipLevel required' });
+  const level = parseInt(vipLevel);
+  if (level < 1 || level > 24) return res.status(400).json({ error: 'VIP level must be 1-24' });
+  try {
+    const user = await dbQuery('users', 'id, username', { id: userId }, { single: true });
+    if (!user.data) return res.status(404).json({ error: 'User not found' });
+    const plan = VIP_PLANS[level];
+    if (!plan) return res.status(400).json({ error: 'Invalid VIP plan' });
+    await dbInsert('investments', { user_id: userId, vip_level: level, amount: plan.amount, daily_return: plan.dailyReturn, status: 'active', reference: 'ADMIN-' + Date.now(), total_collected: 0, days_collected: 0 });
+    await dbInsert('notifications', { user_id: userId, title: 'VIP Investment Added', message: `Admin added VIP ${level} investment (₦${plan.amount.toLocaleString()}). Daily return: ₦${plan.dailyReturn.toLocaleString()}.` });
+    res.json({ success: true, message: `VIP ${level} investment created for ${user.data.username}` });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/edit-investment/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const invId = parseInt(req.params.id);
