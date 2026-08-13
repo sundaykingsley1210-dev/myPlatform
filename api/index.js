@@ -1473,7 +1473,7 @@ app.post('/api/admin/edit-investment/:id', requireAuth, requireAdmin, async (req
 });
 
 app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res) => {
-  const { nickname, email, phone, vip_level, balance } = req.body;
+  const { nickname, email, phone, vip_level, balance, earnings_balance } = req.body;
   const target = await dbQuery('users', 'username', { id: req.params.id }, { single: true });
   if (target.data && target.data.username === 'admin') return res.status(400).json({ error: 'Cannot edit the main admin account' });
   const allowedFields = {};
@@ -1482,6 +1482,7 @@ app.post('/api/admin/edit-user/:id', requireAuth, requireAdmin, async (req, res)
   if (phone !== undefined) allowedFields.phone = phone;
   if (vip_level !== undefined && vip_level !== null) allowedFields.vip_level = parseInt(vip_level) || 0;
   if (balance !== undefined && balance !== null) allowedFields.balance = parseFloat(balance) || 0;
+  if (earnings_balance !== undefined && earnings_balance !== null) allowedFields.earnings_balance = parseFloat(earnings_balance) || 0;
   try {
     await dbUpdate('users', allowedFields, { id: req.params.id });
     await dbInsert('notifications', { user_id: req.params.id, title: 'Account Updated', message: `Admin updated your account. ${vip_level !== undefined ? 'VIP Level: ' + vip_level + '. ' : ''}${balance !== undefined ? 'Balance: ₦' + Number(balance).toLocaleString() + '.' : ''}` });
