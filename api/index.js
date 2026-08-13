@@ -115,164 +115,35 @@ app.get('/api/debug-db', async (req, res) => {
 });
 
 app.get('/api/debug-users', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.json({ error: 'No Supabase' });
-    const users = await sb.from('users').select('id, username, email, balance, total_earned, vip_level, earnings_balance, bonus_balance, is_admin, plain_password, created_at');
-    const investments = await sb.from('investments').select('id, user_id, vip_level, amount, daily_return, status, total_collected, days_collected');
-    const transactions = await sb.from('transactions').select('id, user_id, type, amount, status, vip_level');
-    const withdrawals = await sb.from('withdrawals').select('id, user_id, amount, status');
-    res.json({ users: users.data, investments: investments.data, transactions: transactions.data, withdrawals: withdrawals.data });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/restore-user', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const bcrypt = require('bcryptjs');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-
-    const { username, email, password, balance, total_earned, vip_level, earnings_balance, bonus_balance, is_admin } = req.query;
-    if (!username || !email || !password) return res.status(400).json({ error: 'Missing username, email, or password' });
-
-    const hash = await bcrypt.hash(password, 10);
-
-    const existing = await sb.from('users').select('id').eq('username', username).single();
-    let userId;
-    if (existing.data) {
-      userId = existing.data.id;
-      const { error: ue } = await sb.from('users').update({
-        email, password: hash, plain_password: password,
-        balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
-        vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
-        bonus_balance: Number(bonus_balance) || 0, is_admin: is_admin === 'true'
-      }).eq('id', userId);
-      if (ue) return res.status(500).json({ error: ue.message });
-      return res.json({ success: true, message: `Updated ${username}`, user_id: userId });
-    }
-
-    userId = crypto.randomUUID();
-    const { error: ue } = await sb.from('users').insert({
-      id: userId, username, email, password: hash, plain_password: password,
-      balance: Number(balance) || 0, total_earned: Number(total_earned) || 0,
-      vip_level: Number(vip_level) || 0, earnings_balance: Number(earnings_balance) || 0,
-      bonus_balance: Number(bonus_balance) || 0, is_admin: is_admin === 'true'
-    });
-    if (ue) return res.status(500).json({ error: ue.message });
-
-    res.json({ success: true, message: `Created ${username}`, user_id: userId });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/fix-column-types', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const results = [];
-
-    const dropRecreate = async (table) => {
-      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${table}` }); results.push(`${table}: cleared`); } catch (e) { results.push(`${table} clear: ${e.message}`); }
-      try { await sb.rpc('exec_sql', { query: `ALTER TABLE ${table} DROP COLUMN IF EXISTS user_id` }); results.push(`${table}: dropped user_id`); } catch (e) { results.push(`${table} drop: ${e.message}`); }
-      try { await sb.rpc('exec_sql', { query: `ALTER TABLE ${table} ADD COLUMN user_id UUID` }); results.push(`${table}: added user_id UUID`); } catch (e) { results.push(`${table} add: ${e.message}`); }
-    };
-
-    await dropRecreate('investments');
-    await dropRecreate('transactions');
-    await dropRecreate('task_claims');
-    await dropRecreate('notifications');
-    await dropRecreate('withdrawals');
-    await dropRecreate('savings');
-    await dropRecreate('messages');
-
-    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); results.push('schema reloaded'); } catch (e) { results.push('schema reload: ' + e.message); }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/recreate-investments', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const { user_id, investments } = req.query;
-    if (!user_id || !investments) return res.status(400).json({ error: 'Missing user_id or investments' });
-    const invData = JSON.parse(investments);
-    const results = [];
-    for (const inv of invData) {
-      const { error } = await sb.from('investments').insert({
-        user_id, vip_level: inv.vip_level, amount: inv.amount, daily_return: inv.daily_return,
-        status: inv.status || 'active', total_collected: inv.total_collected || 0, days_collected: inv.days_collected || 0
-      });
-      results.push(error ? error.message : `VIP${inv.vip_level} inserted`);
-    }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/recreate-transactions', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const { user_id, transactions } = req.query;
-    if (!user_id || !transactions) return res.status(400).json({ error: 'Missing user_id or transactions' });
-    const txData = JSON.parse(transactions);
-    const results = [];
-    for (const tx of txData) {
-      const { error } = await sb.from('transactions').insert({
-        user_id, type: tx.type, amount: tx.amount, status: tx.status || 'completed', vip_level: tx.vip_level || 0
-      });
-      results.push(error ? error.message : `${tx.type} ₦${tx.amount} inserted`);
-    }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/cleanup-orphaned', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const results = [];
-    const tables = ['investments', 'transactions', 'task_claims', 'notifications', 'withdrawals', 'savings', 'messages'];
-    for (const t of tables) {
-      try { await sb.rpc('exec_sql', { query: `DELETE FROM ${t} WHERE user_id IS NULL` }); results.push(`${t}: cleared`); } catch (e) { results.push(`${t}: ${e.message}`); }
-    }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/delete-investment', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Missing id' });
-    const { error } = await sb.from('investments').delete().eq('id', Number(id));
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, message: `Deleted investment ${id}` });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Use POST /api/admin/delete-investment/:id instead' });
 });
 
 app.get('/api/delete-user', async (req, res) => {
-  try {
-    const { supabase: getSupabase } = require('../database');
-    const sb = getSupabase();
-    if (!sb) return res.status(500).json({ error: 'No Supabase' });
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Missing id' });
-    await sb.from('investments').delete().eq('user_id', id);
-    await sb.from('transactions').delete().eq('user_id', id);
-    await sb.from('withdrawals').delete().eq('user_id', id);
-    await sb.from('notifications').delete().eq('user_id', id);
-    const { error } = await sb.from('users').delete().eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, message: `Deleted user ${id}` });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Use POST /api/admin/delete-user/:id instead' });
 });
 
 function generateToken(user) {
@@ -779,7 +650,7 @@ app.get('/api/admin/transactions', requireAuth, requireAdmin, async (req, res) =
 app.post('/api/admin/transaction/:id/approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status, reference', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status, reference', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
 
     const tx = result.data;
@@ -853,7 +724,7 @@ app.post('/api/admin/transaction/:id/approve', requireAuth, requireAdmin, async 
 app.post('/api/admin/transaction/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('transactions', 'user_id, vip_level, amount, status', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Transaction not found' });
 
     const tx = result.data;
@@ -876,10 +747,10 @@ app.get('/api/admin/investments', requireAuth, requireAdmin, async (req, res) =>
 app.post('/api/admin/withdrawal/:id/approve', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('withdrawals', 'user_id, amount', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('withdrawals', 'user_id, amount', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
-    await dbUpdate('withdrawals', { status: 'approved', admin_note: req.body.note || 'Approved by admin — payment pending', approved_at: new Date().toISOString() }, { id: parseInt(id) });
+    await dbUpdate('withdrawals', { status: 'approved', admin_note: req.body.note || 'Approved by admin — payment pending', approved_at: new Date().toISOString() }, { id: id });
     await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Approved', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been approved. Payment is being processed.` });
 
     res.json({ success: true, message: 'Withdrawal approved' });
@@ -889,10 +760,10 @@ app.post('/api/admin/withdrawal/:id/approve', requireAuth, requireAdmin, async (
 app.post('/api/admin/withdrawal/:id/confirm', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
-    await dbUpdate('withdrawals', { status: 'completed', admin_note: req.body.note || 'Payment confirmed — funds sent', confirmed_at: new Date().toISOString() }, { id: parseInt(id) });
+    await dbUpdate('withdrawals', { status: 'completed', admin_note: req.body.note || 'Payment confirmed — funds sent', confirmed_at: new Date().toISOString() }, { id: id });
     await dbInsert('notifications', { user_id: result.data.user_id, title: 'Withdrawal Paid', message: `Your withdrawal of ₦${result.data.amount.toLocaleString()} has been sent to ${result.data.bank_name} (${result.data.account_number}). Please check your account.` });
 
     res.json({ success: true, message: 'Payment confirmed' });
@@ -902,10 +773,10 @@ app.post('/api/admin/withdrawal/:id/confirm', requireAuth, requireAdmin, async (
 app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('withdrawals', 'user_id, amount, earnings_amount, account_number, account_name, bank_name', { id: parseInt(id) }, { single: true });
+    const result = await dbQuery('withdrawals', 'user_id, amount, earnings_amount, account_number, account_name, bank_name', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
-    await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin', rejected_at: new Date().toISOString() }, { id: parseInt(id) });
+    await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin', rejected_at: new Date().toISOString() }, { id: id });
 
     const userRes = await dbQuery('users', 'earnings_balance', { id: result.data.user_id }, { single: true });
     const currentEarnings = parseFloat(userRes.data.earnings_balance) || 0;
@@ -994,38 +865,7 @@ app.get('/api/setup-admin', async (req, res) => {
 });
 
 app.get('/api/setup-columns', async (req, res) => {
-  try {
-    if (!isSupabase()) return res.json({ success: false, message: 'Not using Supabase' });
-    const { supabase } = require('../database');
-    const sb = supabase();
-    const results = [];
-    const columns = [
-      { table: 'users', col: 'referral_code', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'referred_by', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'reset_code', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'reset_expires', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'nickname', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'avatar_url', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'full_name', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'phone', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'email', type: "TEXT DEFAULT ''" },
-      { table: 'users', col: 'is_admin', type: "BOOLEAN DEFAULT false" },
-      { table: 'transactions', col: 'vip_level', type: 'INTEGER DEFAULT 0' },
-      { table: 'withdrawals', col: 'vat_amount', type: 'REAL DEFAULT 0' },
-      { table: 'withdrawals', col: 'credit_amount', type: 'REAL DEFAULT 0' },
-    ];
-    for (const c of columns) {
-      try {
-        const { error } = await sb.rpc('exec_sql', { query: `ALTER TABLE ${c.table} ADD COLUMN IF NOT EXISTS ${c.col} ${c.type}` });
-        if (error) results.push(`${c.table}.${c.col}: ${error.message}`);
-        else results.push(`${c.table}.${c.col}: OK`);
-      } catch (e) { results.push(`${c.table}.${c.col}: ${e.message}`); }
-    }
-    try { await sb.from('messages').select('id').limit(1); results.push('messages: exists'); } catch (e) {
-      try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT 'user', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('messages: created'); } catch (e2) { results.push('messages: ' + e2.message); }
-    }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/config-status', (req, res) => {
@@ -1037,39 +877,7 @@ app.get('/api/config-status', (req, res) => {
 });
 
 app.get('/api/migrate', async (req, res) => {
-  try {
-    if (!isSupabase()) return res.json({ success: false, message: 'Not using Supabase' });
-    const { supabase } = require('../database');
-    const sb = supabase();
-    const results = [];
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS vip_level INTEGER DEFAULT 0' }); results.push('transactions.vip_level added'); } catch (e) { results.push('transactions.vip_level: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS vat_amount REAL DEFAULT 0' }); results.push('withdrawals.vat_amount added'); } catch (e) { results.push('withdrawals.vat_amount: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS credit_amount REAL DEFAULT 0' }); results.push('withdrawals.credit_amount added'); } catch (e) { results.push('withdrawals.credit_amount: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT \'\'' }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT \'\'' }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_code TEXT DEFAULT \'\'' }); results.push('users.reset_code added'); } catch (e) { results.push('users.reset_code: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires TEXT DEFAULT \'\'' }); results.push('users.reset_expires added'); } catch (e) { results.push('users.reset_expires: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS nickname TEXT DEFAULT \'\'' }); results.push('users.nickname added'); } catch (e) { results.push('users.nickname: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT \'\'' }); results.push('users.avatar_url added'); } catch (e) { results.push('users.avatar_url: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE investments ADD COLUMN IF NOT EXISTS location TEXT DEFAULT \'\'' }); results.push('investments.location added'); } catch (e) { results.push('investments.location: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE transactions ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('transactions.rejected_at added'); } catch (e) { results.push('transactions.rejected_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS rejected_at TEXT DEFAULT \'\'' }); results.push('withdrawals.rejected_at added'); } catch (e) { results.push('withdrawals.rejected_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS approved_at TEXT DEFAULT \'\'' }); results.push('withdrawals.approved_at added'); } catch (e) { results.push('withdrawals.approved_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: 'ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT DEFAULT \'\'' }); results.push('withdrawals.confirmed_at added'); } catch (e) { results.push('withdrawals.confirmed_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS savings (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, amount REAL NOT NULL, duration_days INTEGER NOT NULL, interest_rate REAL NOT NULL, matures_at TEXT NOT NULL, status TEXT DEFAULT 'active', created_at TIMESTAMPTZ DEFAULT NOW())" }); results.push('savings table created'); } catch (e) { results.push('savings: ' + e.message); }
-    try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT DEFAULT ''" }); results.push('users.username added'); } catch (e) { results.push('users.username: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT DEFAULT ''" }); results.push('users.password added'); } catch (e) { results.push('users.password: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by TEXT DEFAULT ''" }); results.push('users.referred_by added'); } catch (e) { results.push('users.referred_by: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code TEXT DEFAULT ''" }); results.push('users.referral_code added'); } catch (e) { results.push('users.referral_code: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE users SET username = 'admin' WHERE email = 'enrichu001@gmail.com' AND (username IS NULL OR username = '')" }); results.push('admin username set'); } catch (e) { results.push('admin username set: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "UPDATE users SET is_admin = true WHERE email = 'enrichu001@gmail.com'" }); results.push('admin flag set'); } catch (e) { results.push('admin flag set: ' + e.message); }
-    try { await sb.from('messages').select('id').limit(1); } catch (e) { try { await sb.rpc('exec_sql', { query: 'CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT DEFAULT \'user\', message TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())' }); results.push('messages table created'); } catch (e2) { results.push('messages table: ' + e2.message); } }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS approved_at TEXT DEFAULT ''" }); results.push('withdrawals.approved_at added'); } catch (e) { results.push('withdrawals.approved_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS confirmed_at TEXT DEFAULT ''" }); results.push('withdrawals.confirmed_at added'); } catch (e) { results.push('withdrawals.confirmed_at: ' + e.message); }
-    try { await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" }); results.push('schema reloaded'); } catch (e) { results.push('schema reload: ' + e.message); }
-    res.json({ success: true, results });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  res.json({ disabled: 'Endpoint removed for production' });
 });
 
 app.get('/api/fix-login', async (req, res) => {
@@ -1384,7 +1192,7 @@ app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
 // ===================== ADMIN USER INVESTMENTS =====================
 app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await dbQuery('investments', '*', { user_id: parseInt(req.params.userId) }, { order: { column: 'created_at', ascending: false } });
+    const result = await dbQuery('investments', '*', { user_id: req.params.userId }, { order: { column: 'created_at', ascending: false } });
     res.json({ investments: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1446,13 +1254,13 @@ app.post('/api/admin/add-balance', requireAuth, requireAdmin, async (req, res) =
   const { userId, amount } = req.body;
   if (!userId || !amount || amount <= 0) return res.status(400).json({ error: 'userId and positive amount required' });
   try {
-    const user = await dbQuery('users', 'id, balance, total_earned', { id: parseInt(userId) }, { single: true });
+    const user = await dbQuery('users', 'id, balance, total_earned', { id: userId }, { single: true });
     if (!user.data) return res.status(404).json({ error: 'User not found' });
     const newBal = user.data.balance + parseFloat(amount);
     const newEarned = user.data.total_earned + parseFloat(amount);
-    await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: parseInt(userId) });
-    await dbInsert('transactions', { user_id: parseInt(userId), type: 'admin_credit', vip_level: 0, amount: parseFloat(amount), status: 'completed', reference: 'ADMIN-' + Date.now(), bank_name: '', account_number: '', account_name: '' });
-    await dbInsert('notifications', { user_id: parseInt(userId), title: 'Balance Credited', message: `Admin credited ₦${parseFloat(amount).toLocaleString()} to your wallet.` });
+    await dbUpdate('users', { balance: newBal, total_earned: newEarned }, { id: userId });
+    await dbInsert('transactions', { user_id: userId, type: 'admin_credit', vip_level: 0, amount: parseFloat(amount), status: 'completed', reference: 'ADMIN-' + Date.now(), bank_name: '', account_number: '', account_name: '' });
+    await dbInsert('notifications', { user_id: userId, title: 'Balance Credited', message: `Admin credited ₦${parseFloat(amount).toLocaleString()} to your wallet.` });
     res.json({ success: true, message: `₦${parseFloat(amount).toLocaleString()} added to user's wallet` });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

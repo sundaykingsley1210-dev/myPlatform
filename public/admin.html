@@ -546,7 +546,7 @@
     async function sendDirectMessage() {
       const userSelect = document.getElementById('adminMsgUser');
       const msgInput = document.getElementById('adminMsgText');
-      const userId = parseInt(userSelect.value);
+      const userId = userSelect.value;
       const msg = msgInput.value.trim();
       if (!userId) return showToast('Please select a user', 'error');
       if (!msg) return showToast('Please type a message', 'error');
