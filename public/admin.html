@@ -287,6 +287,7 @@
             ${!u.is_admin ? `<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
               <button class="btn btn-accent btn-sm" onclick="creditBalance('${u.id}','${displayName}')"><i class="fas fa-plus-circle"></i> Credit</button>
               <button class="btn btn-outline btn-sm" onclick="adminUpgradeVip('${u.id}','${displayName}')" style="border-color:#a855f7;color:#a855f7;"><i class="fas fa-crown"></i> VIP</button>
+              <button class="btn btn-outline btn-sm" onclick="deleteInvestment('${u.id}','${displayName}')"><i class="fas fa-trash"></i> Remove VIP</button>
               <button class="btn btn-outline btn-sm" onclick="editUser('${u.id}','${displayName}','${u.email || ''}','${u.phone || ''}','${u.nickname || ''}')"><i class="fas fa-pen"></i> Edit</button>
               <button class="btn btn-outline btn-sm" onclick="resetUserPassword('${u.id}','${displayName}')" style="border-color:#f59e0b;color:#f59e0b;"><i class="fas fa-key"></i> Reset Password</button>
               <button class="btn btn-danger btn-sm" onclick="deleteUser('${u.id}','${displayName}')"><i class="fas fa-trash"></i> Delete</button>
@@ -784,7 +785,17 @@
       } catch (err) { showToast('Failed', 'error'); }
     }
 
-    async function loadResetRequests() {
+     async function deleteInvestment(userId, username) {
+       if (!confirm(`Remove all VIP levels for ${username}? This will mark higher VIP investments as deleted. VIP 1 will remain intact.`)) return;
+       try {
+         const res = await API('/api/admin/delete-investment', { method: 'POST', body: JSON.stringify({ id: userId }) });
+         const data = await res.json();
+         if (res.ok) { showToast('Investment removed', 'success'); loadUsers(); }
+         else showToast(data.error, 'error');
+       } catch (err) { showToast('Failed', 'error'); }
+     }
+
+     async function loadResetRequests() {
       try {
         const res = await API('/api/admin/reset-requests');
         const data = await res.json();
