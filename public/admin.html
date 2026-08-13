@@ -396,7 +396,6 @@
         const list = document.getElementById('investmentsList');
         if (!data.investments || !data.investments.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>'; return; }
         let html = '<div style="margin-bottom:16px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="purgeDeletedInvestments()"><i class="fas fa-broom"></i> Purge Deleted Investments</button></div>';
-        let html = '';
         data.investments.forEach(inv => {
           const c = inv.status === 'active' ? '#22c55e' : '#ef4444';
           const u = userMap[inv.user_id] || {};
