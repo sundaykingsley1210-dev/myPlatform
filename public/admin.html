@@ -395,6 +395,7 @@
         (usersData.users || []).forEach(u => { userMap[u.id] = u; });
         const list = document.getElementById('investmentsList');
         if (!data.investments || !data.investments.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>'; return; }
+        let html = '<div style="margin-bottom:16px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="purgeDeletedInvestments()"><i class="fas fa-broom"></i> Purge Deleted Investments</button></div>';
         let html = '';
         data.investments.forEach(inv => {
           const c = inv.status === 'active' ? '#22c55e' : '#ef4444';
@@ -429,6 +430,16 @@
         const res = await API('/api/admin/delete-investment/' + id, { method: 'POST' });
         if (res.ok) { showToast('Investment deleted', 'success'); loadAdminInvestments(); }
         else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
+      } catch (e) { showToast('Error', 'error'); }
+    }
+
+    async function purgeDeletedInvestments() {
+      if (!confirm('Permanently remove all soft-deleted investments from the database?')) return;
+      try {
+        const res = await API('/api/admin/purge-deleted-investments', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) { showToast(data.message, 'success'); loadAdminInvestments(); }
+        else showToast(data.error || 'Failed', 'error');
       } catch (e) { showToast('Error', 'error'); }
     }
 

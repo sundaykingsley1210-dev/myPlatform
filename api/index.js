@@ -405,7 +405,7 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
 
 app.get('/api/my-investments', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('investments', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: false } });
+    const result = await dbQuery('investments', '*', { user_id: req.userId, status: { op: 'neq', val: 'deleted' } }, { order: { column: 'created_at', ascending: false } });
     const investments = (result.data || []).map(i => ({ id: i.id, vipLevel: i.vip_level, amount: i.amount, dailyReturn: i.daily_return, status: i.status, totalCollected: i.total_collected, daysCollected: i.days_collected, createdAt: i.created_at }));
     res.json({ investments });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1243,6 +1243,16 @@ app.post('/api/admin/delete-user-investments', requireAuth, requireAdmin, async 
     await dbInsert('notifications', { user_id: userId, title: 'Investments Removed', message: `Admin removed ${invCount} investment(s). ₦${totalRefund.toLocaleString()} has been refunded to your wallet.` });
 
     res.json({ success: true, message: `${invCount} investment(s) deleted. ₦${totalRefund.toLocaleString()} refunded.`, deletedCount: invCount, refundAmount: totalRefund });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/purge-deleted-investments', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const deleted = await dbQuery('investments', 'id', { status: 'deleted' });
+    const count = (deleted.data || []).length;
+    if (count === 0) return res.json({ success: true, message: 'No deleted investments to purge', deletedCount: 0 });
+    await dbDelete('investments', { status: 'deleted' });
+    res.json({ success: true, message: `${count} deleted investment(s) permanently removed`, deletedCount: count });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
