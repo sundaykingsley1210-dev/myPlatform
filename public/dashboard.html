@@ -183,6 +183,12 @@
             showToast('₦' + Number(d.totalRefunded).toLocaleString() + ' refunded to your wallet', 'success');
           }
         }).catch(() => {});
+
+        const pendingRef = localStorage.getItem('pendingPaymentRef');
+        const pendingTime = localStorage.getItem('pendingPaymentTime');
+        if (pendingRef && pendingTime && (Date.now() - parseInt(pendingTime)) < 3600000) {
+          retryVerifyPayment(pendingRef);
+        }
         setInterval(checkAdminMessages, 15000);
         setInterval(checkWithdrawRejections, 15000);
         setInterval(loadChatWidget, 10000);
@@ -420,6 +426,9 @@
             return;
           }
 
+          localStorage.setItem('pendingPaymentRef', pd.reference);
+          localStorage.setItem('pendingPaymentTime', Date.now().toString());
+
           const handler = PaystackPop.setup({
             key: pd.paystackKey,
             email: userData.email || 'user@enrichu.com',
@@ -522,6 +531,8 @@
           if (res.ok) {
             clearInterval(autoVerifyInterval);
             if (countdownInterval) clearInterval(countdownInterval);
+            localStorage.removeItem('pendingPaymentRef');
+            localStorage.removeItem('pendingPaymentTime');
             if (data.status === 'pending_approval') {
               updateTracker('done', 'Payment confirmed! Awaiting admin approval.');
               showPendingApproval();
@@ -544,6 +555,25 @@
       paymentExpiresAt = null;
       document.getElementById('paymentArea').style.display = 'none';
       document.querySelectorAll('.vip-select-card').forEach(c => c.classList.remove('selected'));
+      localStorage.removeItem('pendingPaymentRef');
+      localStorage.removeItem('pendingPaymentTime');
+    }
+
+    async function retryVerifyPayment(reference) {
+      try {
+        const res = await API('/api/verify-payment', { method: 'POST', body: JSON.stringify({ reference }) });
+        const data = await res.json();
+        if (res.ok && data.status !== 'pending_approval') {
+          localStorage.removeItem('pendingPaymentRef');
+          localStorage.removeItem('pendingPaymentTime');
+          showToast('Previous payment verified! Investment activated.', 'success');
+          loadInvestments();
+          loadUserData();
+        } else if (!res.ok && data.error !== 'Payment not yet confirmed. Please wait a few minutes after payment and try again.') {
+          localStorage.removeItem('pendingPaymentRef');
+          localStorage.removeItem('pendingPaymentTime');
+        }
+      } catch (e) {}
     }
 
     async function verifyPayment(reference) {
@@ -556,6 +586,8 @@
         if (res.ok) {
           if (autoVerifyInterval) clearInterval(autoVerifyInterval);
           if (countdownInterval) clearInterval(countdownInterval);
+          localStorage.removeItem('pendingPaymentRef');
+          localStorage.removeItem('pendingPaymentTime');
           if (data.status === 'pending_approval') {
             updateTracker('done', 'Payment confirmed! Awaiting admin approval.');
             showToast(data.message, 'success');
