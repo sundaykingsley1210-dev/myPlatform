@@ -859,7 +859,7 @@ app.post('/api/admin/withdrawal/:id/confirm', requireAuth, requireAdmin, async (
 app.post('/api/admin/withdrawal/:id/reject', requireAuth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await dbQuery('withdrawals', 'user_id, amount, earnings_amount, account_number, account_name, bank_name', { id: id }, { single: true });
+    const result = await dbQuery('withdrawals', 'user_id, amount, account_number, account_name, bank_name', { id: id }, { single: true });
     if (!result.data) return res.status(404).json({ error: 'Withdrawal not found' });
 
     await dbUpdate('withdrawals', { status: 'rejected', admin_note: req.body.note || 'Rejected by admin', rejected_at: new Date().toISOString() }, { id: id });
