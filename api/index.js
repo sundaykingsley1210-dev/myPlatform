@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
+const crypto = require('crypto');
 const path = require('path');
 const { initDatabase, dbQuery, dbInsert, dbUpdate, dbDelete, isSupabase } = require('../database');
 
@@ -403,6 +404,91 @@ app.post('/api/verify-payment', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ===================== PAYSTACK WEBHOOK =====================
+// Paystack sends webhook events here when payments succeed.
+// Configure your Paystack dashboard webhook URL to: https://your-domain.vercel.app/api/webhook/paystack
+app.post('/api/webhook/paystack', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const signature = req.headers['x-paystack-signature'];
+    if (!signature) return res.status(400).json({ error: 'No signature' });
+
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    const hash = crypto.createHmac('sha512', PAYSTACK_SECRET).update(rawBody).digest('hex');
+    if (hash !== signature) return res.status(400).json({ error: 'Invalid signature' });
+
+    const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+    if (event.event === 'charge.success') {
+      const data = event.data;
+      const reference = data.reference;
+      console.log('Paystack webhook: charge.success for', reference);
+
+      const result = await dbQuery('transactions', 'id, user_id, vip_level, amount, status', { reference }, { single: true });
+      if (!result.data) { console.log('Webhook: transaction not found for', reference); return res.json({ received: true }); }
+      if (result.data.status === 'completed') { console.log('Webhook: already completed', reference); return res.json({ received: true }); }
+
+      const tx = result.data;
+      const plan = VIP_PLANS[tx.vip_level];
+      if (!plan) { console.log('Webhook: invalid plan for', reference); return res.json({ received: true }); }
+
+      const userLocation = NG_LOCATIONS[tx.user_id % NG_LOCATIONS.length];
+
+      const userRes = await dbQuery('users', 'balance, total_earned', { id: tx.user_id }, { single: true });
+      const newBal = (userRes.data.balance || 0) + tx.amount;
+      await dbUpdate('users', { balance: newBal }, { id: tx.user_id });
+
+      const existingInv = await dbQuery('investments', 'id, vip_level, amount, status', { user_id: tx.user_id, status: 'active' });
+      let refundAmount = 0;
+      if (existingInv.data && existingInv.data.length > 0) {
+        for (const inv of existingInv.data) {
+          if (inv.vip_level < tx.vip_level) {
+            refundAmount += inv.amount;
+            await dbUpdate('investments', { status: 'upgraded' }, { id: inv.id });
+            await dbInsert('notifications', { user_id: tx.user_id, title: 'VIP Upgraded', message: `Your VIP ${inv.vip_level} investment has been upgraded to VIP ${tx.vip_level}. ₦${inv.amount.toLocaleString()} has been refunded to your wallet.` });
+          }
+        }
+      }
+
+      if (refundAmount > 0) {
+        const userBal2 = await dbQuery('users', 'balance', { id: tx.user_id }, { single: true });
+        await dbUpdate('users', { balance: (userBal2.data.balance || 0) + refundAmount }, { id: tx.user_id });
+      }
+
+      await dbUpdate('transactions', { status: 'completed' }, { id: tx.id });
+      await dbInsert('investments', { user_id: tx.user_id, vip_level: tx.vip_level, amount: tx.amount, daily_return: plan.dailyReturn, status: 'active', location: userLocation });
+
+      const userBal3 = await dbQuery('users', 'balance, vip_level', { id: tx.user_id }, { single: true });
+      const newVipLevel = Math.max(userBal3.data.vip_level || 0, tx.vip_level);
+      await dbUpdate('users', { balance: (userBal3.data.balance || 0) - tx.amount, vip_level: newVipLevel }, { id: tx.user_id });
+
+      const msg = refundAmount > 0
+        ? `Your payment of ₦${tx.amount.toLocaleString()} is approved! VIP ${tx.vip_level} activated. ₦${refundAmount.toLocaleString()} refunded from previous investment.`
+        : `Your payment of ₦${tx.amount.toLocaleString()} is approved! VIP ${tx.vip_level} activated. You can now collect daily returns.`;
+      await dbInsert('notifications', { user_id: tx.user_id, title: 'Investment Activated!', message: msg });
+
+      try {
+        const investor = await dbQuery('users', 'referred_by', { id: tx.user_id }, { single: true });
+        if (investor.data && investor.data.referred_by) {
+          const referrer = await dbQuery('users', 'id, username, balance, total_earned, bonus_balance', { referral_code: investor.data.referred_by }, { single: true });
+          if (referrer.data) {
+            const bonus = Math.round(tx.amount * 0.10);
+            const refNewEarned = (referrer.data.total_earned || 0) + bonus;
+            const existingBonus = referrer.data.bonus_balance || 0;
+            await dbUpdate('users', { bonus_balance: existingBonus + bonus, bonus_date: new Date().toISOString(), total_earned: refNewEarned }, { id: referrer.data.id });
+            await dbInsert('transactions', { user_id: referrer.data.id, type: 'referral_bonus', vip_level: 0, amount: bonus, status: 'completed', reference: `REF-${tx.reference}`, bank_name: '', account_number: '', account_name: '' });
+            await dbInsert('notifications', { user_id: referrer.data.id, title: 'Referral Bonus!', message: `You earned ₦${bonus.toLocaleString()} referral bonus! It will be available for withdrawal in 2 weeks.` });
+          }
+        }
+      } catch (e) { console.log('Referral bonus error:', e.message); }
+
+      console.log('Webhook: payment activated for', reference);
+    }
+
+    res.json({ received: true });
+  } catch (err) { console.log('Webhook error:', err.message); res.json({ received: true }); }
+});
+
+// ===================== MY INVESTMENTS =====================
 app.get('/api/my-investments', requireAuth, async (req, res) => {
   try {
     const result = await dbQuery('investments', '*', { user_id: req.userId, status: { op: 'neq', val: 'deleted' } }, { order: { column: 'created_at', ascending: false } });
