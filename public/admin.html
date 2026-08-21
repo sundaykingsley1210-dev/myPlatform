@@ -394,9 +394,11 @@
         const userMap = {};
         (usersData.users || []).forEach(u => { userMap[u.id] = u; });
         const list = document.getElementById('investmentsList');
-        if (!data.investments || !data.investments.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>'; return; }
-        let html = '<div style="margin-bottom:16px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="purgeDeletedInvestments()"><i class="fas fa-broom"></i> Purge Deleted Investments</button></div>';
-        data.investments.forEach(inv => {
+        const activeInvs = (data.investments || []).filter(inv => inv.status === 'active');
+        if (!activeInvs.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>'; return; }
+        const nonActiveCount = (data.investments || []).length - activeInvs.length;
+        let html = nonActiveCount > 0 ? '<div style="margin-bottom:16px;display:flex;gap:8px;"><button class="btn btn-danger btn-sm" onclick="purgeDeletedInvestments()"><i class="fas fa-broom"></i> Remove ' + nonActiveCount + ' Non-Active Investment(s)</button></div>' : '';
+        activeInvs.forEach(inv => {
           const c = inv.status === 'active' ? '#22c55e' : '#ef4444';
           const u = userMap[inv.user_id] || {};
           const displayName = u.nickname || u.username || 'User #' + inv.user_id;
@@ -427,13 +429,20 @@
       if (!confirm('Delete ' + user + '\'s ' + vip + ' investment?')) return;
       try {
         const res = await API('/api/admin/delete-investment/' + id, { method: 'POST' });
-        if (res.ok) { showToast('Investment deleted', 'success'); loadAdminInvestments(); }
-        else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
+        if (res.ok) {
+          showToast('Investment deleted', 'success');
+          const card = document.querySelector('[onclick*="deleteInvestment(' + id + '"]');
+          if (card) { let el = card.closest('.investment-card'); if (el) el.remove(); }
+          const list = document.getElementById('investmentsList');
+          if (list && !list.querySelector('.investment-card')) {
+            list.innerHTML = '<div class="empty-state"><i class="fas fa-chart-line"></i><h3>No Investments</h3></div>';
+          }
+        } else { const d = await res.json(); showToast(d.error || 'Failed', 'error'); }
       } catch (e) { showToast('Error', 'error'); }
     }
 
     async function purgeDeletedInvestments() {
-      if (!confirm('Permanently remove all soft-deleted investments from the database?')) return;
+      if (!confirm('Permanently remove all non-active investments from the database?')) return;
       try {
         const res = await API('/api/admin/purge-deleted-investments', { method: 'POST' });
         const data = await res.json();

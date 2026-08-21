@@ -826,7 +826,8 @@ app.post('/api/admin/transaction/:id/reject', requireAuth, requireAdmin, async (
 app.get('/api/admin/investments', requireAuth, requireAdmin, async (req, res) => {
   try {
     const result = await dbQuery('investments', '*', {}, { order: { column: 'created_at', ascending: false } });
-    res.json({ investments: result.data || [] });
+    const investments = (result.data || []).filter(inv => inv.status === 'active');
+    res.json({ investments });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1332,12 +1333,17 @@ app.post('/api/admin/delete-user-investments', requireAuth, requireAdmin, async 
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+
 app.post('/api/admin/purge-deleted-investments', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const deleted = await dbQuery('investments', 'id', { status: 'deleted' });
-    const count = (deleted.data || []).length;
+    const all = await dbQuery('investments', 'id, status', {});
+    const nonActive = (all.data || []).filter(inv => inv.status !== 'active');
+    const count = nonActive.length;
     if (count === 0) return res.json({ success: true, message: 'No deleted investments to purge', deletedCount: 0 });
-    await dbDelete('investments', { status: 'deleted' });
+    for (const inv of nonActive) {
+      await dbDelete('investments', { id: inv.id });
+    }
     res.json({ success: true, message: `${count} deleted investment(s) permanently removed`, deletedCount: count });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1604,6 +1610,14 @@ let dbInitialized = false;
 module.exports = async (req, res) => {
   if (!dbInitialized) {
     await initDatabase();
+    try {
+      const all = await dbQuery('investments', 'id, status', {});
+      const nonActive = (all.data || []).filter(inv => inv.status !== 'active');
+      for (const inv of nonActive) {
+        await dbDelete('investments', { id: inv.id });
+      }
+      if (nonActive.length) console.log(`Purged ${nonActive.length} non-active investments on startup`);
+    } catch (e) { console.log('Startup purge skipped:', e.message); }
     dbInitialized = true;
   }
   return app(req, res);
