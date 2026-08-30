@@ -1225,15 +1225,35 @@ app.get('/api/admin/savings', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ===================== CHAT / SUPPORT =====================
+const MESSAGE_EXPIRY_HOURS = 48;
+
+function getMessageExpiryFilter() {
+  return new Date(Date.now() - MESSAGE_EXPIRY_HOURS * 60 * 60 * 1000).toISOString();
+}
+
 async function fetchMessages(filters, options) {
-  const result = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', filters, options);
+  const expiry = getMessageExpiryFilter();
+  const filteredFilters = { ...filters, created_at: { op: 'gt', val: expiry } };
+  const result = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', filteredFilters, options);
   if (result.error) {
     console.log('fetchMessages column error, retrying without is_read:', result.error.message);
-    const fallback = await dbQuery('messages', 'id, user_id, sender, message, created_at', filters, options);
+    const fallback = await dbQuery('messages', 'id, user_id, sender, message, created_at', filteredFilters, options);
     if (fallback.data) fallback.data = fallback.data.map(m => ({ ...m, is_read: false }));
     return fallback;
   }
   return result;
+}
+
+async function cleanupExpiredMessages() {
+  try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (!sb) return;
+    const expiry = getMessageExpiryFilter();
+    const { error } = await sb.from('messages').delete().lte('created_at', expiry);
+    if (!error) console.log('Cleaned up expired messages (older than ' + MESSAGE_EXPIRY_HOURS + 'h)');
+    else console.log('Message cleanup error:', error.message);
+  } catch (e) { console.log('Message cleanup skipped:', e.message); }
 }
 
 app.get('/api/messages', requireAuth, async (req, res) => {
@@ -1744,6 +1764,7 @@ module.exports = async (req, res) => {
       }
       if (nonActive.length) console.log(`Purged ${nonActive.length} non-active investments on startup`);
     } catch (e) { console.log('Startup purge skipped:', e.message); }
+    cleanupExpiredMessages();
     dbInitialized = true;
   }
   return app(req, res);
