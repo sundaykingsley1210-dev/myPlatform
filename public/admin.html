@@ -588,6 +588,21 @@
       } catch (err) { showToast('Failed to send', 'error'); }
     }
 
+    function copySql() {
+      const code = document.getElementById('sqlCode');
+      if (code) {
+        navigator.clipboard.writeText(code.textContent).then(() => showToast('SQL copied to clipboard!', 'success')).catch(() => {
+          const range = document.createRange();
+          range.selectNode(code);
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(range);
+          document.execCommand('copy');
+          window.getSelection().removeAllRanges();
+          showToast('SQL copied!', 'success');
+        });
+      }
+    }
+
     async function setupMessagesTable() {
       const resultDiv = document.getElementById('setupMessagesResult');
       const btn = document.getElementById('setupMsgBtn');
@@ -622,11 +637,13 @@
             <i class="fas fa-database" style="font-size:2.5rem;color:var(--gold);margin-bottom:16px;"></i>
             <h3 style="margin-bottom:12px;">Messages Table Missing</h3>
             <p style="color:var(--text-muted);margin-bottom:20px;max-width:500px;margin-left:auto;margin-right:auto;">The messages database table does not exist. Click below to create it, or run the SQL manually in Supabase SQL Editor.</p>
-            <button class="btn btn-primary" onclick="setupMessagesTable()" id="setupMsgBtn" style="margin-bottom:12px;"><i class="fas fa-tools" style="margin-right:8px;"></i> Create Messages Table</button>
+            <button class="btn btn-primary" onclick="setupMessagesTable()" id="setupMsgBtn" style="margin-bottom:12px;"><i class="fas fa-tools" style="margin-right:8px;"></i> Try Auto Setup</button>
             <div id="setupMessagesResult" style="margin-top:12px;"></div>
-            <div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;">
-              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Or run this SQL in your Supabase SQL Editor:</p>
-              <pre style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);">CREATE TABLE IF NOT EXISTS messages (
+            <div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;border:2px solid var(--gold);">
+              <p style="font-size:0.85rem;color:var(--gold);margin-bottom:8px;font-weight:700;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Manual Setup Required</p>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;">Copy the SQL below, go to your <a href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" style="color:var(--primary);font-weight:600;">Supabase SQL Editor</a>, paste it, and click <strong>Run</strong>:</p>
+              <div style="position:relative;">
+                <pre id="sqlCode" style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);white-space:pre-wrap;">CREATE TABLE IF NOT EXISTS messages (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
   sender TEXT NOT NULL DEFAULT 'user',
@@ -634,8 +651,21 @@
   is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);</pre>
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Service role full access'
+  ) THEN
+    CREATE POLICY "Service role full access" ON messages
+      FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;</pre>
+                <button onclick="copySql()" style="position:absolute;top:8px;right:8px;padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.75rem;"><i class="fas fa-copy" style="margin-right:4px;"></i>Copy SQL</button>
+              </div>
+              <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">After running the SQL, click <strong>Refresh</strong> below.</p>
+              <button class="btn btn-primary" onclick="loadDirectMessages()" style="margin-top:8px;"><i class="fas fa-sync" style="margin-right:6px;"></i>Refresh</button>
             </div>
           </div>`;
           return;

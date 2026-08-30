@@ -1308,7 +1308,8 @@ app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
     const sb = getSupabase();
     if (sb) {
       const check = await sb.from('messages').select('id').limit(1);
-      if (check.error && check.error.message && check.error.message.includes('Could not find the table')) {
+      if (check.error) {
+        console.log('Messages table check failed:', check.error.message);
         return res.status(500).json({ error: 'Messages table does not exist. Go to Admin > Messages tab and click "Create Messages Table", or run the SQL in Supabase SQL Editor.' });
       }
     }
@@ -1344,10 +1345,16 @@ app.get('/api/admin/setup-messages', requireAuth, requireAdmin, async (req, res)
   if (!sb) return res.json({ success: false, error: 'No Supabase client' });
   const results = [];
   try {
-    let r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
+    let r = await sb.rpc('exec_sql', { query: "CREATE OR REPLACE FUNCTION exec_sql(query text) RETURNS void AS $$ BEGIN EXECUTE query; END; $$ LANGUAGE plpgsql SECURITY DEFINER" });
+    results.push({ step: 'ensure exec_sql function', error: r.error ? r.error.message : null, data: r.data });
+    r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
     results.push({ step: 'create messages table', error: r.error ? r.error.message : null, data: r.data });
     r = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
     results.push({ step: 'add is_read column', error: r.error ? r.error.message : null, data: r.data });
+    r = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ENABLE ROW LEVEL SECURITY" });
+    results.push({ step: 'enable RLS', error: r.error ? r.error.message : null, data: r.data });
+    r = await sb.rpc('exec_sql', { query: "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Service role full access') THEN CREATE POLICY \"Service role full access\" ON messages FOR ALL USING (true) WITH CHECK (true); END IF; END $$" });
+    results.push({ step: 'create RLS policy', error: r.error ? r.error.message : null, data: r.data });
     await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" });
     results.push({ step: 'reload schema', error: null });
     const verify = await sb.from('messages').select('id').limit(1);
@@ -1363,7 +1370,9 @@ app.get('/api/admin/check-messages-table', requireAuth, requireAdmin, async (req
   try {
     const result = await sb.from('messages').select('id').limit(1);
     if (result.error) {
-      res.json({ exists: false, error: result.error.message });
+      const msg = result.error.message || '';
+      const isMissing = msg.includes('Could not find') || msg.includes('does not exist') || msg.includes('not found') || msg.includes('42P01');
+      res.json({ exists: false, error: msg, isMissing });
     } else {
       res.json({ exists: true });
     }
