@@ -97,6 +97,7 @@ app.get('/api/migrate-db', async (req, res) => {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_date TIMESTAMPTZ DEFAULT NOW()",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS earnings_balance NUMERIC DEFAULT 0",
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE",
   ];
 
   for (const sql of migrations) {
@@ -964,7 +965,15 @@ app.get('/api/config-status', (req, res) => {
 });
 
 app.get('/api/migrate', async (req, res) => {
-  res.json({ disabled: 'Endpoint removed for production' });
+  const { supabase: getSupabase } = require('../database');
+  const sb = getSupabase();
+  if (!sb) return res.json({ error: 'No Supabase' });
+  try {
+    const { error } = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
+    if (error) return res.json({ success: false, error: error.message, hint: 'Run this SQL in Supabase SQL Editor: ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE' });
+    await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" });
+    res.json({ success: true, message: 'is_read column added' });
+  } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
 app.get('/api/fix-login', async (req, res) => {
@@ -1212,9 +1221,23 @@ app.get('/api/admin/savings', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // ===================== CHAT / SUPPORT =====================
+async function fetchMessages(filters, options) {
+  try {
+    const result = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', filters, options);
+    return result;
+  } catch (err) {
+    if (err.message && (err.message.includes('is_read') || err.message.includes('column'))) {
+      const result = await dbQuery('messages', 'id, user_id, sender, message, created_at', filters, options);
+      if (result.data) result.data = result.data.map(m => ({ ...m, is_read: false }));
+      return result;
+    }
+    throw err;
+  }
+}
+
 app.get('/api/messages', requireAuth, async (req, res) => {
   try {
-    const result = await dbQuery('messages', '*', { user_id: req.userId }, { order: { column: 'created_at', ascending: true } });
+    const result = await fetchMessages({ user_id: req.userId }, { order: { column: 'created_at', ascending: true } });
     res.json({ messages: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1223,7 +1246,8 @@ app.post('/api/messages', requireAuth, async (req, res) => {
   const { message } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
   try {
-    await dbInsert('messages', { user_id: req.userId, sender: 'user', message: message.trim() });
+    const insertData = { user_id: req.userId, sender: 'user', message: message.trim() };
+    await dbInsert('messages', insertData);
 
     // Auto-reply system
     const userMsgs = await dbQuery('messages', 'id', { user_id: req.userId, sender: 'user' });
@@ -1259,9 +1283,18 @@ app.post('/api/messages', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/messages/read', requireAuth, async (req, res) => {
+  const { messageId } = req.body;
+  if (!messageId) return res.status(400).json({ error: 'messageId required' });
+  try {
+    await dbUpdate('messages', { is_read: true }, { id: messageId, user_id: req.userId, sender: 'admin' });
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const result = await dbQuery('messages', '*', {}, { order: { column: 'created_at', ascending: true } });
+    const result = await fetchMessages({}, { order: { column: 'created_at', ascending: true } });
     res.json({ messages: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1610,6 +1643,22 @@ let dbInitialized = false;
 module.exports = async (req, res) => {
   if (!dbInitialized) {
     await initDatabase();
+    try {
+      const { supabase: getSupabase } = require('../database');
+      const sb = getSupabase();
+      if (sb) {
+        const { error: colErr } = await sb.from('messages').select('is_read').limit(1);
+        if (colErr && colErr.message && colErr.message.includes('is_read')) {
+          console.log('Adding is_read column to messages table...');
+          const { error: altErr } = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
+          if (altErr) {
+            console.log('exec_sql failed, trying direct query...');
+            await sb.from('messages').select('id').limit(1);
+          }
+          console.log('is_read migration attempted');
+        }
+      }
+    } catch (e) { console.log('Startup migration for is_read skipped:', e.message); }
     try {
       const all = await dbQuery('investments', 'id, status', {});
       const nonActive = (all.data || []).filter(inv => inv.status !== 'active');

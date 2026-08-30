@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS messages (
   user_id INTEGER NOT NULL REFERENCES users(id),
   sender TEXT NOT NULL DEFAULT 'user',
   message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

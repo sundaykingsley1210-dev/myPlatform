@@ -233,16 +233,14 @@
         const res = await API('/api/messages');
         const data = await res.json();
         const msgs = data.messages || [];
-        const now = Date.now();
-        const sixHrs = 6 * 60 * 60 * 1000;
-        const recentAdminMsgs = msgs.filter(m => m.sender === 'admin' && (now - new Date(m.created_at).getTime()) < sixHrs);
+        const unreadAdminMsgs = msgs.filter(m => m.sender === 'admin' && !m.is_read);
         const badge = document.getElementById('msgBadge');
         const banner = document.getElementById('adminMsgBanner');
-        if (recentAdminMsgs.length > 0) {
-          badge.textContent = recentAdminMsgs.length;
+        if (unreadAdminMsgs.length > 0) {
+          badge.textContent = unreadAdminMsgs.length;
           badge.style.display = 'inline';
-          document.getElementById('adminMsgTime').textContent = new Date(recentAdminMsgs[recentAdminMsgs.length - 1].created_at).toLocaleString();
-          document.getElementById('adminMsgContent').innerHTML = recentAdminMsgs.map(m => '<div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid var(--primary);"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">' + new Date(m.created_at).toLocaleString() + '</div><div>' + m.message + '</div></div>').join('');
+          document.getElementById('adminMsgTime').textContent = new Date(unreadAdminMsgs[unreadAdminMsgs.length - 1].created_at).toLocaleString();
+          document.getElementById('adminMsgContent').innerHTML = unreadAdminMsgs.map(m => '<div style="margin-bottom:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:3px solid var(--primary);cursor:pointer;" onclick="markMessageRead(' + m.id + ')"><div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px;">' + new Date(m.created_at).toLocaleString() + ' <span style="color:var(--primary);">● Tap to mark read</span></div><div>' + m.message + '</div></div>').join('');
           banner.style.display = 'block';
         } else {
           badge.style.display = 'none';
@@ -1278,8 +1276,22 @@
         const box = document.getElementById('chatMessages');
         if (!box) return;
         if (!data.messages || !data.messages.length) { box.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No messages yet. Send a message to start chatting with support.</p>'; return; }
-        box.innerHTML = data.messages.map(m => '<div style="margin-bottom:12px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div style="display:inline-block;padding:10px 14px;border-radius:12px;max-width:80%;background:' + (m.sender === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.05)') + ';color:' + (m.sender === 'user' ? 'white' : 'var(--text-primary)') + ';font-size:0.85rem;">' + m.message + '</div><div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">' + new Date(m.created_at).toLocaleString() + '</div></div>').join('');
+        box.innerHTML = data.messages.map(m => {
+          const isUnread = m.sender === 'admin' && !m.is_read;
+          const readIndicator = m.sender === 'admin' ? (m.is_read ? '<span style="font-size:0.6rem;color:var(--primary);margin-left:6px;">✓ Read</span>' : '<span style="font-size:0.6rem;color:var(--text-muted);margin-left:6px;">● Unread</span>') : '';
+          const clickAttr = isUnread ? ' onclick="markMessageRead(' + m.id + ')" style="cursor:pointer;"' : '';
+          return '<div style="margin-bottom:12px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div' + clickAttr + ' style="display:inline-block;padding:10px 14px;border-radius:12px;max-width:80%;background:' + (m.sender === 'user' ? 'var(--primary)' : (isUnread ? 'rgba(0,87,255,0.12)' : 'rgba(255,255,255,0.05)')) + ';color:' + (m.sender === 'user' ? 'white' : 'var(--text-primary)') + ';font-size:0.85rem;border:' + (isUnread ? '1px solid rgba(0,87,255,0.3)' : 'none') + ';">' + m.message + readIndicator + '</div><div style="font-size:0.65rem;color:var(--text-muted);margin-top:4px;">' + new Date(m.created_at).toLocaleString() + '</div></div>';
+        }).join('');
         box.scrollTop = box.scrollHeight;
+      } catch (err) {}
+    }
+
+    async function markMessageRead(messageId) {
+      try {
+        await API('/api/messages/read', { method: 'POST', body: JSON.stringify({ messageId }) });
+        loadChatMessages();
+        loadChatWidget();
+        checkAdminMessages();
       } catch (err) {}
     }
 
@@ -1296,7 +1308,6 @@
 
     let chatWidgetOpen = false;
     let chatWidgetPoll = null;
-    let chatWidgetLastCount = 0;
 
     function toggleChatWidget() {
       const box = document.getElementById('chatWidgetBox');
@@ -1305,12 +1316,24 @@
         box.style.display = 'flex';
         document.getElementById('chatWidgetBubble').style.transform = 'scale(0.9)';
         loadChatWidget();
+        markAllAdminMessagesRead();
         chatWidgetPoll = setInterval(loadChatWidget, 5000);
       } else {
         box.style.display = 'none';
         document.getElementById('chatWidgetBubble').style.transform = 'scale(1)';
         if (chatWidgetPoll) { clearInterval(chatWidgetPoll); chatWidgetPoll = null; }
       }
+    }
+
+    async function markAllAdminMessagesRead() {
+      try {
+        const res = await API('/api/messages');
+        const data = await res.json();
+        const unread = (data.messages || []).filter(m => m.sender === 'admin' && !m.is_read);
+        for (const m of unread) {
+          await API('/api/messages/read', { method: 'POST', body: JSON.stringify({ messageId: m.id }) });
+        }
+      } catch (e) {}
     }
 
     async function loadChatWidget() {
@@ -1321,17 +1344,20 @@
         const box = document.getElementById('chatWidgetMessages');
         if (!box) return;
         const wasAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
-        box.innerHTML = msgs.length ? msgs.map(m => '<div style="margin-bottom:10px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div style="display:inline-block;padding:8px 12px;border-radius:12px;max-width:85%;background:' + (m.sender === 'user' ? 'var(--primary)' : 'rgba(255,255,255,0.08)') + ';color:' + (m.sender === 'user' ? '#fff' : 'var(--text-primary)') + ';font-size:0.85rem;line-height:1.4;">' + m.message + '</div><div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '</div></div>').join('') : '<p style="color:var(--text-muted);text-align:center;padding:40px 10px;font-size:0.85rem;">Send a message to start chatting with support.</p>';
+        box.innerHTML = msgs.length ? msgs.map(m => {
+          const isUnread = m.sender === 'admin' && !m.is_read;
+          const clickAttr = isUnread ? ' onclick="markMessageRead(' + m.id + ');event.stopPropagation();" style="cursor:pointer;"' : '';
+          return '<div style="margin-bottom:10px;text-align:' + (m.sender === 'user' ? 'right' : 'left') + ';"><div' + clickAttr + ' style="display:inline-block;padding:8px 12px;border-radius:12px;max-width:85%;background:' + (m.sender === 'user' ? 'var(--primary)' : (isUnread ? 'rgba(0,87,255,0.12)' : 'rgba(255,255,255,0.08)')) + ';color:' + (m.sender === 'user' ? '#fff' : 'var(--text-primary)') + ';font-size:0.85rem;line-height:1.4;border:' + (isUnread ? '1px solid rgba(0,87,255,0.3)' : 'none') + ';">' + m.message + '</div><div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">' + new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + (isUnread ? ' <span style="color:var(--primary);">●</span>' : ' <span style="color:var(--primary);">✓</span>') + '</div></div>';
+        }).join('') : '<p style="color:var(--text-muted);text-align:center;padding:40px 10px;font-size:0.85rem;">Send a message to start chatting with support.</p>';
         if (wasAtBottom) box.scrollTop = box.scrollHeight;
-        const adminMsgs = msgs.filter(m => m.sender === 'admin');
+        const unreadCount = msgs.filter(m => m.sender === 'admin' && !m.is_read).length;
         const badge = document.getElementById('chatUnreadBadge');
-        if (adminMsgs.length > chatWidgetLastCount && !chatWidgetOpen) {
-          badge.textContent = adminMsgs.length;
+        if (unreadCount > 0 && !chatWidgetOpen) {
+          badge.textContent = unreadCount;
           badge.style.display = 'flex';
-        } else if (chatWidgetOpen) {
+        } else {
           badge.style.display = 'none';
         }
-        chatWidgetLastCount = adminMsgs.length;
       } catch (e) {}
     }
 
