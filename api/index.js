@@ -1222,17 +1222,14 @@ app.get('/api/admin/savings', requireAuth, requireAdmin, async (req, res) => {
 
 // ===================== CHAT / SUPPORT =====================
 async function fetchMessages(filters, options) {
-  try {
-    const result = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', filters, options);
-    return result;
-  } catch (err) {
-    if (err.message && (err.message.includes('is_read') || err.message.includes('column'))) {
-      const result = await dbQuery('messages', 'id, user_id, sender, message, created_at', filters, options);
-      if (result.data) result.data = result.data.map(m => ({ ...m, is_read: false }));
-      return result;
-    }
-    throw err;
+  const result = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', filters, options);
+  if (result.error) {
+    console.log('fetchMessages column error, retrying without is_read:', result.error.message);
+    const fallback = await dbQuery('messages', 'id, user_id, sender, message, created_at', filters, options);
+    if (fallback.data) fallback.data = fallback.data.map(m => ({ ...m, is_read: false }));
+    return fallback;
   }
+  return result;
 }
 
 app.get('/api/messages', requireAuth, async (req, res) => {
@@ -1303,8 +1300,12 @@ app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
   const { userId, message } = req.body;
   if (!userId || !message) return res.status(400).json({ error: 'userId and message required' });
   try {
-    await dbInsert('messages', { user_id: userId, sender: 'admin', message: message.trim() });
-    await dbInsert('notifications', { user_id: userId, title: 'Support Reply', message: 'Admin replied to your message. Check your chat.' });
+    const insertResult = await dbInsert('messages', { user_id: parseInt(userId) || userId, sender: 'admin', message: message.trim() });
+    if (insertResult.error) {
+      console.log('Admin message insert error:', insertResult.error.message);
+      return res.status(500).json({ error: 'Failed to send message: ' + insertResult.error.message });
+    }
+    const notifResult = await dbInsert('notifications', { user_id: parseInt(userId) || userId, title: 'Support Reply', message: 'Admin replied to your message. Check your chat.' });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1314,6 +1315,14 @@ app.get('/api/admin/user-investments/:userId', requireAuth, requireAdmin, async 
   try {
     const result = await dbQuery('investments', '*', { user_id: req.params.userId }, { order: { column: 'created_at', ascending: false } });
     res.json({ investments: result.data || [] });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/debug/messages', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const allMsgs = await dbQuery('messages', 'id, user_id, sender, message, is_read, created_at', {}, { order: { column: 'created_at', ascending: false }, limit: 20 });
+    const users = await dbQuery('users', 'id, username', {});
+    res.json({ messages: allMsgs.data || [], users: users.data || [], is_read_exists: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
