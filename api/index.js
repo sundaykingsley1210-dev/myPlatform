@@ -1381,6 +1381,17 @@ app.get('/api/admin/check-messages-table', requireAuth, requireAdmin, async (req
   } catch (e) { res.json({ exists: false, error: e.message }); }
 });
 
+app.get('/api/debug-msgs', requireAuth, async (req, res) => {
+  try {
+    const allMsgs = await dbQuery('messages', '*', {}, { order: { column: 'created_at', ascending: false }, limit: 10 });
+    const userId = req.userId;
+    const userIdType = typeof userId;
+    const matched = (allMsgs.data || []).filter(m => String(m.user_id) === String(userId));
+    const allUserIds = (allMsgs.data || []).map(m => ({ stored: m.user_id, storedType: typeof m.user_id, str: String(m.user_id) }));
+    res.json({ userId, userIdType, userIdStr: String(userId), totalMessages: (allMsgs.data || []).length, matchedCount: matched.length, allUserIds, queryError: allMsgs.error ? allMsgs.error.message : null });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/admin/delete-investment/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
