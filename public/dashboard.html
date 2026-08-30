@@ -1275,6 +1275,10 @@
         const data = await res.json();
         const box = document.getElementById('chatMessages');
         if (!box) return;
+        if (data.error && data.error.includes('table')) {
+          box.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">Support is temporarily unavailable. Please try again later.</p>';
+          return;
+        }
         if (!data.messages || !data.messages.length) { box.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px;">No messages yet. Send a message to start chatting with support.</p>'; return; }
         box.innerHTML = data.messages.map(m => {
           const isUnread = m.sender === 'admin' && !m.is_read;

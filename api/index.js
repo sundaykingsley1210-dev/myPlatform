@@ -1304,6 +1304,14 @@ app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
   const { userId, message } = req.body;
   if (!userId || !message) return res.status(400).json({ error: 'userId and message required' });
   try {
+    const { supabase: getSupabase } = require('../database');
+    const sb = getSupabase();
+    if (sb) {
+      const check = await sb.from('messages').select('id').limit(1);
+      if (check.error && check.error.message && check.error.message.includes('Could not find the table')) {
+        return res.status(500).json({ error: 'Messages table does not exist. Go to Admin > Messages tab and click "Create Messages Table", or run the SQL in Supabase SQL Editor.' });
+      }
+    }
     const insertResult = await dbInsert('messages', { user_id: parseInt(userId) || userId, sender: 'admin', message: message.trim() });
     if (insertResult.error) {
       console.log('Admin message insert error:', insertResult.error.message);
@@ -1328,6 +1336,38 @@ app.get('/api/debug/messages', requireAuth, requireAdmin, async (req, res) => {
     const users = await dbQuery('users', 'id, username', {});
     res.json({ messages: allMsgs.data || [], users: users.data || [], is_read_exists: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/setup-messages', requireAuth, requireAdmin, async (req, res) => {
+  const { supabase: getSupabase } = require('../database');
+  const sb = getSupabase();
+  if (!sb) return res.json({ success: false, error: 'No Supabase client' });
+  const results = [];
+  try {
+    let r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
+    results.push({ step: 'create messages table', error: r.error ? r.error.message : null, data: r.data });
+    r = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
+    results.push({ step: 'add is_read column', error: r.error ? r.error.message : null, data: r.data });
+    await sb.rpc('exec_sql', { query: "NOTIFY pgrst, 'reload schema'" });
+    results.push({ step: 'reload schema', error: null });
+    const verify = await sb.from('messages').select('id').limit(1);
+    results.push({ step: 'verify table exists', error: verify.error ? verify.error.message : null, tableExists: !verify.error });
+    res.json({ success: !verify.error, results });
+  } catch (e) { res.json({ success: false, error: e.message, results }); }
+});
+
+app.get('/api/admin/check-messages-table', requireAuth, requireAdmin, async (req, res) => {
+  const { supabase: getSupabase } = require('../database');
+  const sb = getSupabase();
+  if (!sb) return res.json({ exists: false, error: 'No Supabase client' });
+  try {
+    const result = await sb.from('messages').select('id').limit(1);
+    if (result.error) {
+      res.json({ exists: false, error: result.error.message });
+    } else {
+      res.json({ exists: true });
+    }
+  } catch (e) { res.json({ exists: false, error: e.message }); }
 });
 
 app.post('/api/admin/delete-investment/:id', requireAuth, requireAdmin, async (req, res) => {

@@ -588,9 +588,58 @@
       } catch (err) { showToast('Failed to send', 'error'); }
     }
 
+    async function setupMessagesTable() {
+      const resultDiv = document.getElementById('setupMessagesResult');
+      const btn = document.getElementById('setupMsgBtn');
+      if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Creating...'; }
+      try {
+        const res = await API('/api/admin/setup-messages');
+        const data = await res.json();
+        if (resultDiv) {
+          if (data.success) {
+            resultDiv.innerHTML = '<div style="padding:12px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);color:#22c55e;font-size:0.85rem;"><i class="fas fa-check-circle" style="margin-right:8px;"></i> Messages table created successfully! Reloading...</div>';
+            setTimeout(() => loadDirectMessages(), 1500);
+          } else {
+            const steps = (data.results || []).map(r => '<div style="font-size:0.75rem;color:' + (r.error ? '#ef4444' : '#22c55e') + ';">' + r.step + ': ' + (r.error || 'ok') + '</div>').join('');
+            resultDiv.innerHTML = '<div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:#ef4444;font-size:0.85rem;"><i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> Setup failed: ' + (data.error || 'Unknown error') + '</div><div style="margin-top:8px;">' + steps + '</div><div style="margin-top:12px;padding:12px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;"><p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Please run this SQL manually in your <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--primary);">Supabase SQL Editor</a>:</p><pre style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);">CREATE TABLE IF NOT EXISTS messages (\n  id SERIAL PRIMARY KEY,\n  user_id INTEGER NOT NULL,\n  sender TEXT NOT NULL DEFAULT \'user\',\n  message TEXT NOT NULL,\n  is_read BOOLEAN DEFAULT FALSE,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nALTER TABLE messages ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);</pre></div>';
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tools" style="margin-right:8px;"></i> Retry Setup'; }
+          }
+        }
+      } catch (err) {
+        if (resultDiv) resultDiv.innerHTML = '<div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:#ef4444;font-size:0.85rem;"><i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> Error: ' + err.message + '</div>';
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tools" style="margin-right:8px;"></i> Retry Setup'; }
+      }
+    }
+
     async function loadDirectMessages() {
       const area = document.getElementById('directMessages');
       try {
+        const tableCheck = await API('/api/admin/check-messages-table');
+        const tableData = await tableCheck.json();
+        if (!tableData.exists) {
+          area.innerHTML = `
+          <div class="investment-card" style="text-align:center;padding:40px;">
+            <i class="fas fa-database" style="font-size:2.5rem;color:var(--gold);margin-bottom:16px;"></i>
+            <h3 style="margin-bottom:12px;">Messages Table Missing</h3>
+            <p style="color:var(--text-muted);margin-bottom:20px;max-width:500px;margin-left:auto;margin-right:auto;">The messages database table does not exist. Click below to create it, or run the SQL manually in Supabase SQL Editor.</p>
+            <button class="btn btn-primary" onclick="setupMessagesTable()" id="setupMsgBtn" style="margin-bottom:12px;"><i class="fas fa-tools" style="margin-right:8px;"></i> Create Messages Table</button>
+            <div id="setupMessagesResult" style="margin-top:12px;"></div>
+            <div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;">
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Or run this SQL in your Supabase SQL Editor:</p>
+              <pre style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);">CREATE TABLE IF NOT EXISTS messages (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  sender TEXT NOT NULL DEFAULT 'user',
+  message TEXT NOT NULL,
+  is_read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);</pre>
+            </div>
+          </div>`;
+          return;
+        }
         const usersRes = await API('/api/admin/users');
         const usersData = await usersRes.json();
         const allUsers = usersData.users || [];
