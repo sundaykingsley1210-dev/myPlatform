@@ -640,10 +640,22 @@
             <button class="btn btn-primary" onclick="setupMessagesTable()" id="setupMsgBtn" style="margin-bottom:12px;"><i class="fas fa-tools" style="margin-right:8px;"></i> Try Auto Setup</button>
             <div id="setupMessagesResult" style="margin-top:12px;"></div>
             <div style="margin-top:20px;padding:16px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;border:2px solid var(--gold);">
-              <p style="font-size:0.85rem;color:var(--gold);margin-bottom:8px;font-weight:700;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>Manual Setup Required</p>
-              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;">Copy the SQL below, go to your <a href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" style="color:var(--primary);font-weight:600;">Supabase SQL Editor</a>, paste it, and click <strong>Run</strong>:</p>
+              <p style="font-size:0.85rem;color:var(--gold);margin-bottom:8px;font-weight:700;"><i class="fas fa-exclamation-triangle" style="margin-right:6px;"></i>One-Time Setup Required</p>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">Step 1: Click the link below to open Supabase SQL Editor:</p>
+              <p style="margin-bottom:12px;"><a href="https://supabase.com/dashboard/project/_/sql/new" target="_blank" style="color:var(--primary);font-weight:600;font-size:0.9rem;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>Open Supabase SQL Editor</a></p>
+              <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Step 2: Click <strong>Copy SQL</strong> below, paste into SQL Editor, and click <strong>Run</strong>:</p>
               <div style="position:relative;">
-                <pre id="sqlCode" style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);white-space:pre-wrap;">CREATE TABLE IF NOT EXISTS messages (
+                <pre id="sqlCode" style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);white-space:pre-wrap;">CREATE OR REPLACE FUNCTION exec_sql(query TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  EXECUTE query;
+  RETURN 'OK';
+EXCEPTION WHEN OTHERS THEN
+  RETURN SQLERRM;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TABLE IF NOT EXISTS messages (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL,
   sender TEXT NOT NULL DEFAULT 'user',
@@ -661,10 +673,12 @@ DO $$ BEGIN
     CREATE POLICY "Service role full access" ON messages
       FOR ALL USING (true) WITH CHECK (true);
   END IF;
-END $$;</pre>
+END $$;
+
+NOTIFY pgrst, 'reload schema';</pre>
                 <button onclick="copySql()" style="position:absolute;top:8px;right:8px;padding:6px 12px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:0.75rem;"><i class="fas fa-copy" style="margin-right:4px;"></i>Copy SQL</button>
               </div>
-              <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">After running the SQL, click <strong>Refresh</strong> below.</p>
+              <p style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">Step 3: After running the SQL, click <strong>Refresh</strong> below.</p>
               <button class="btn btn-primary" onclick="loadDirectMessages()" style="margin-top:8px;"><i class="fas fa-sync" style="margin-right:6px;"></i>Refresh</button>
             </div>
           </div>`;
