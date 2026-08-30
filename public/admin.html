@@ -53,6 +53,7 @@
         <button class="dash-tab" onclick="switchTab('investments',this)"><i class="fas fa-chart-line"></i> Investments</button>
         <button class="dash-tab" onclick="switchTab('savings',this)"><i class="fas fa-piggy-bank"></i> Savings</button>
         <button class="dash-tab" onclick="switchTab('support',this)"><i class="fas fa-headset"></i> Support</button>
+        <button class="dash-tab" onclick="switchTab('messages',this)"><i class="fas fa-envelope"></i> Messages</button>
         <button class="dash-tab" onclick="switchTab('data',this)"><i class="fas fa-database"></i> Data</button>
         <button class="dash-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
         <button class="dash-tab" onclick="switchTab('resets',this)"><i class="fas fa-key"></i> Resets</button>
@@ -65,6 +66,7 @@
       <div class="dash-panel" id="panel-investments"><div id="investmentsList"></div></div>
       <div class="dash-panel" id="panel-savings"><div id="savingsList"></div></div>
       <div class="dash-panel" id="panel-support"><div id="supportList"></div></div>
+      <div class="dash-panel" id="panel-messages"><div id="directMessages"></div></div>
       <div class="dash-panel" id="panel-data"><div id="dataManage"></div></div>
       <div class="dash-panel" id="panel-users"><div id="usersList"></div></div>
       <div class="dash-panel" id="panel-resets"><div id="resetsList"></div></div>
@@ -97,6 +99,7 @@
       if (tab === 'investments') loadAdminInvestments();
       if (tab === 'savings') loadAdminSavings();
       if (tab === 'support') loadAdminSupport();
+      if (tab === 'messages') loadDirectMessages();
       if (tab === 'data') loadDataManage();
       if (tab === 'activity') loadActivityLog();
       if (tab === 'settings') loadSettings();
@@ -576,12 +579,73 @@
       if (!userId) return showToast('Please select a user', 'error');
       if (!msg) return showToast('Please type a message', 'error');
       try {
-        await API('/api/admin/messages', { method: 'POST', body: JSON.stringify({ userId, message: msg }) });
+        const res = await API('/api/admin/messages', { method: 'POST', body: JSON.stringify({ userId, message: msg }) });
+        const data = await res.json();
+        if (data.error) return showToast(data.error, 'error');
         msgInput.value = '';
-        userSelect.value = '';
         showToast('Message sent', 'success');
-        loadAdminSupport();
+        loadDirectMessages();
       } catch (err) { showToast('Failed to send', 'error'); }
+    }
+
+    async function loadDirectMessages() {
+      const area = document.getElementById('directMessages');
+      try {
+        const usersRes = await API('/api/admin/users');
+        const usersData = await usersRes.json();
+        const allUsers = usersData.users || [];
+        const userOptions = allUsers.map(u => '<option value="' + u.id + '">' + (u.nickname || u.username) + ' (' + (u.email || 'no email') + ')</option>').join('');
+
+        area.innerHTML = `
+        <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;">
+          <div style="flex:1;min-width:300px;">
+            <div class="investment-card" style="margin-bottom:0;">
+              <h4 style="margin-bottom:16px;"><i class="fas fa-paper-plane" style="color:var(--primary);margin-right:8px;"></i> Send Direct Message</h4>
+              <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">Select User</label>
+                <select id="adminMsgUser" style="width:100%;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;">
+                  <option value="">-- Choose a user --</option>
+                  ${userOptions}
+                </select>
+              </div>
+              <div style="margin-bottom:12px;">
+                <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;">Message</label>
+                <textarea id="adminMsgText" placeholder="Type your message here..." rows="4" style="width:100%;padding:12px;background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);font-size:0.85rem;resize:vertical;font-family:inherit;"></textarea>
+              </div>
+              <button class="btn btn-primary" onclick="sendDirectMessage()" style="width:100%;"><i class="fas fa-paper-plane" style="margin-right:8px;"></i> Send Message</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:300px;">
+            <div class="investment-card" style="margin-bottom:0;">
+              <h4 style="margin-bottom:16px;"><i class="fas fa-clock-rotate-left" style="color:var(--primary);margin-right:8px;"></i> Recent Messages Sent</h4>
+              <div id="recentMessagesList" style="max-height:400px;overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>`;
+
+        await loadRecentMessages(allUsers);
+      } catch (err) { area.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><h3>Failed to load</h3></div>'; }
+    }
+
+    async function loadRecentMessages(allUsers) {
+      const container = document.getElementById('recentMessagesList');
+      if (!container) return;
+      try {
+        const res = await API('/api/admin/messages');
+        const data = await res.json();
+        const msgs = data.messages || [];
+        const userNames = {};
+        allUsers.forEach(u => { userNames[u.id] = u.nickname || u.username; });
+
+        const adminMsgs = msgs.filter(m => m.sender === 'admin').reverse().slice(0, 50);
+        if (!adminMsgs.length) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;font-size:0.85rem;">No messages sent yet</p>'; return; }
+
+        container.innerHTML = adminMsgs.map(m => {
+          const userName = userNames[m.user_id] || 'User #' + m.user_id;
+          const readStatus = m.is_read ? '<span style="color:var(--primary);font-size:0.7rem;">✓ Read</span>' : '<span style="color:#ef4444;font-size:0.7rem;">● Unread</span>';
+          return '<div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;"><div style="flex-shrink;width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;">' + userName.charAt(0).toUpperCase() + '</div><div style="flex:1;min-width:0;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;"><span style="font-weight:600;font-size:0.85rem;">' + userName + '</span>' + readStatus + '</div><div style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.message + '</div><div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">' + new Date(m.created_at).toLocaleString() + '</div></div></div>';
+        }).join('');
+      } catch (err) { container.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:24px;">Failed to load</p>'; }
     }
 
     function loadDataManage() {
