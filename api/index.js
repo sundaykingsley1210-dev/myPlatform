@@ -97,7 +97,7 @@ app.get('/api/migrate-db', async (req, res) => {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_balance NUMERIC DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_date TIMESTAMPTZ DEFAULT NOW()",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS earnings_balance NUMERIC DEFAULT 0",
-    "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())",
+    "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())",
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE",
   ];
 
@@ -971,7 +971,7 @@ app.get('/api/migrate', async (req, res) => {
   if (!sb) return res.json({ error: 'No Supabase' });
   const results = [];
   try {
-    let r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
+    let r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
     results.push({ step: 'create messages table', result: r.error ? r.error.message : 'ok' });
     r = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
     results.push({ step: 'add is_read column', result: r.error ? r.error.message : 'ok' });
@@ -1347,7 +1347,9 @@ app.get('/api/admin/setup-messages', requireAuth, requireAdmin, async (req, res)
   try {
     let r = await sb.rpc('exec_sql', { query: "CREATE OR REPLACE FUNCTION exec_sql(query text) RETURNS void AS $$ BEGIN EXECUTE query; END; $$ LANGUAGE plpgsql SECURITY DEFINER" });
     results.push({ step: 'ensure exec_sql function', error: r.error ? r.error.message : null, data: r.data });
-    r = await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
+    r = await sb.rpc('exec_sql', { query: "DROP TABLE IF EXISTS messages" });
+    results.push({ step: 'drop old messages table', error: r.error ? r.error.message : null, data: r.data });
+    r = await sb.rpc('exec_sql', { query: "CREATE TABLE messages (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
     results.push({ step: 'create messages table', error: r.error ? r.error.message : null, data: r.data });
     r = await sb.rpc('exec_sql', { query: "ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT FALSE" });
     results.push({ step: 'add is_read column', error: r.error ? r.error.message : null, data: r.data });
@@ -1712,7 +1714,7 @@ module.exports = async (req, res) => {
         const { error: tblErr } = await sb.from('messages').select('id').limit(1);
         if (tblErr && tblErr.message && tblErr.message.includes('Could not find the table')) {
           console.log('Messages table not found, creating...');
-          await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
+          await sb.rpc('exec_sql', { query: "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, user_id TEXT NOT NULL, sender TEXT NOT NULL DEFAULT 'user', message TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMPTZ DEFAULT NOW())" });
           console.log('Messages table creation attempted');
         }
         const { error: colErr } = await sb.from('messages').select('is_read').limit(1);

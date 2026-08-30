@@ -616,7 +616,7 @@
             setTimeout(() => loadDirectMessages(), 1500);
           } else {
             const steps = (data.results || []).map(r => '<div style="font-size:0.75rem;color:' + (r.error ? '#ef4444' : '#22c55e') + ';">' + r.step + ': ' + (r.error || 'ok') + '</div>').join('');
-            resultDiv.innerHTML = '<div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:#ef4444;font-size:0.85rem;"><i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> Setup failed: ' + (data.error || 'Unknown error') + '</div><div style="margin-top:8px;">' + steps + '</div><div style="margin-top:12px;padding:12px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;"><p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Please run this SQL manually in your <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--primary);">Supabase SQL Editor</a>:</p><pre style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);">CREATE TABLE IF NOT EXISTS messages (\n  id SERIAL PRIMARY KEY,\n  user_id INTEGER NOT NULL,\n  sender TEXT NOT NULL DEFAULT \'user\',\n  message TEXT NOT NULL,\n  is_read BOOLEAN DEFAULT FALSE,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nALTER TABLE messages ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);</pre></div>';
+            resultDiv.innerHTML = '<div style="padding:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:#ef4444;font-size:0.85rem;"><i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i> Setup failed: ' + (data.error || 'Unknown error') + '</div><div style="margin-top:8px;">' + steps + '</div><div style="margin-top:12px;padding:12px;background:var(--bg-dark);border-radius:var(--radius-sm);text-align:left;"><p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px;">Please run this SQL manually in your <a href="https://supabase.com/dashboard" target="_blank" style="color:var(--primary);">Supabase SQL Editor</a>:</p><pre style="background:var(--bg-dark);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:0.75rem;overflow-x:auto;color:var(--text-primary);">DROP TABLE IF EXISTS messages;\nCREATE TABLE messages (\n  id SERIAL PRIMARY KEY,\n  user_id TEXT NOT NULL,\n  sender TEXT NOT NULL DEFAULT \'user\',\n  message TEXT NOT NULL,\n  is_read BOOLEAN DEFAULT FALSE,\n  created_at TIMESTAMPTZ DEFAULT NOW()\n);\nALTER TABLE messages ENABLE ROW LEVEL SECURITY;\nCREATE POLICY "Service role full access" ON messages FOR ALL USING (true) WITH CHECK (true);\nNOTIFY pgrst, \'reload schema\';</pre></div>';
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-tools" style="margin-right:8px;"></i> Retry Setup'; }
           }
         }
@@ -655,9 +655,11 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TABLE IF NOT EXISTS messages (
+DROP TABLE IF EXISTS messages;
+
+CREATE TABLE messages (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
   sender TEXT NOT NULL DEFAULT 'user',
   message TEXT NOT NULL,
   is_read BOOLEAN DEFAULT FALSE,

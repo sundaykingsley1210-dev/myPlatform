@@ -12,20 +12,23 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Create messages table
-CREATE TABLE IF NOT EXISTS messages (
+-- 2. Drop old messages table if it exists with wrong column types
+DROP TABLE IF EXISTS messages;
+
+-- 3. Create messages table (user_id TEXT because user IDs are UUIDs)
+CREATE TABLE messages (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL,
+  user_id TEXT NOT NULL,
   sender TEXT NOT NULL DEFAULT 'user',
   message TEXT NOT NULL,
   is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. Enable Row Level Security
+-- 4. Enable Row Level Security
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
--- 4. Create policy for service role access
+-- 5. Create policy for service role access
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies WHERE tablename = 'messages' AND policyname = 'Service role full access'
@@ -35,5 +38,5 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- 5. Reload PostgREST schema cache
+-- 6. Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';

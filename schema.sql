@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 CREATE TABLE IF NOT EXISTS messages (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
   sender TEXT NOT NULL DEFAULT 'user',
   message TEXT NOT NULL,
   is_read BOOLEAN DEFAULT FALSE,
