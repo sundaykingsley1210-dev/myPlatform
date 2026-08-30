@@ -1238,7 +1238,7 @@ async function fetchMessages(filters, options) {
 
 app.get('/api/messages', requireAuth, async (req, res) => {
   try {
-    const result = await fetchMessages({ user_id: req.userId }, { order: { column: 'created_at', ascending: true } });
+    const result = await fetchMessages({ user_id: String(req.userId) }, { order: { column: 'created_at', ascending: true } });
     res.json({ messages: result.data || [] });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1247,11 +1247,11 @@ app.post('/api/messages', requireAuth, async (req, res) => {
   const { message } = req.body;
   if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
   try {
-    const insertData = { user_id: req.userId, sender: 'user', message: message.trim() };
+    const insertData = { user_id: String(req.userId), sender: 'user', message: message.trim() };
     await dbInsert('messages', insertData);
 
     // Auto-reply system
-    const userMsgs = await dbQuery('messages', 'id', { user_id: req.userId, sender: 'user' });
+    const userMsgs = await dbQuery('messages', 'id', { user_id: String(req.userId), sender: 'user' });
     const msgCount = (userMsgs.data || []).length;
     const msgLower = message.trim().toLowerCase();
 
@@ -1277,7 +1277,7 @@ app.post('/api/messages', requireAuth, async (req, res) => {
     }
 
     if (autoReply) {
-      await dbInsert('messages', { user_id: req.userId, sender: 'admin', message: autoReply });
+      await dbInsert('messages', { user_id: String(req.userId), sender: 'admin', message: autoReply });
     }
 
     res.json({ success: true });
@@ -1288,7 +1288,7 @@ app.post('/api/messages/read', requireAuth, async (req, res) => {
   const { messageId } = req.body;
   if (!messageId) return res.status(400).json({ error: 'messageId required' });
   try {
-    await dbUpdate('messages', { is_read: true }, { id: messageId, user_id: req.userId, sender: 'admin' });
+    await dbUpdate('messages', { is_read: true }, { id: messageId, user_id: String(req.userId), sender: 'admin' });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1313,12 +1313,12 @@ app.post('/api/admin/messages', requireAuth, requireAdmin, async (req, res) => {
         return res.status(500).json({ error: 'Messages table does not exist. Go to Admin > Messages tab and click "Create Messages Table", or run the SQL in Supabase SQL Editor.' });
       }
     }
-    const insertResult = await dbInsert('messages', { user_id: parseInt(userId) || userId, sender: 'admin', message: message.trim() });
+    const insertResult = await dbInsert('messages', { user_id: String(userId), sender: 'admin', message: message.trim() });
     if (insertResult.error) {
       console.log('Admin message insert error:', insertResult.error.message);
       return res.status(500).json({ error: 'Failed to send message: ' + insertResult.error.message });
     }
-    const notifResult = await dbInsert('notifications', { user_id: parseInt(userId) || userId, title: 'Support Reply', message: 'Admin replied to your message. Check your chat.' });
+    const notifResult = await dbInsert('notifications', { user_id: String(userId), title: 'Support Reply', message: 'Admin replied to your message. Check your chat.' });
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
